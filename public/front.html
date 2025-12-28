@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Socket Chat</title>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <style>
+    body {
+      font-family: Arial;
+      padding: 20px;
+      background: #f9f9f9;
+    }
+    #chat {
+      border: 1px solid #ccc;
+      height: 300px;
+      overflow-y: auto;
+      margin-bottom: 10px;
+      padding: 10px;
+      background: #fff;
+    }
+    #chat p {
+      margin: 5px 0;
+    }
+  </style>
+</head>
+<body>
+  <h2>🔵 Socket Chat</h2>
+
+  <div>
+    <label>📱 My Phone:</label>
+    <input id="myPhone" type="text" placeholder="مثلاً: 0111"><br><br>
+
+    <label>👤 My Type:</label>
+    <select id="myType">
+      <option value="user">User</option>
+      <option value="rental">RentalOffice</option>
+      <option value="provider">ServiceProvider</option>
+    </select><br><br>
+
+    <label>📞 To Phone:</label>
+    <input id="toPhone" type="text" placeholder="مثلاً: 0123"><br><br>
+
+    <label>👤 To Type:</label>
+    <select id="toType">
+      <option value="user">User</option>
+      <option value="rental">RentalOffice</option>
+      <option value="provider">ServiceProvider</option>
+    </select><br><br>
+
+    <button onclick="connect()">✅ Join Chat</button>
+  </div>
+
+  <hr>
+
+  <div id="chat"></div>
+
+  <input id="messageInput" type="text" placeholder="اكتب رسالتك...">
+  <button onclick="sendMessage()">📤 Send</button>
+
+  <script>
+    const socket = io("http://localhost:3000"); // لو مستضيفة عالسيرفر اكتبي الرابط هناك
+
+    let from = {}, to = {}, roomId = "";
+
+    function getRoomId(p1, p2) {
+      return [p1, p2].sort().join("_");
+    }
+
+    function connect() {
+      from = {
+        phone: document.getElementById("myPhone").value,
+        type: document.getElementById("myType").value
+      };
+      to = {
+        phone: document.getElementById("toPhone").value,
+        type: document.getElementById("toType").value
+      };
+
+      roomId = getRoomId(from.phone, to.phone);
+      socket.emit("join_room", roomId);
+      appendMessage(`🚪 Joined room: ${roomId}`);
+    }
+
+    function sendMessage() {
+      const msg = document.getElementById("messageInput").value;
+      if (!msg) return;
+
+      socket.emit("send_message", {
+        from,
+        to,
+        message: msg
+      });
+
+      appendMessage(`🟢 You: ${msg}`);
+      document.getElementById("messageInput").value = "";
+    }
+
+    socket.on("receive_message", (data) => {
+      appendMessage(`🔵 ${data.from}: ${data.message}`);
+    });
+
+    socket.on("message_sent_successfully", (data) => {
+      console.log("✅ Message saved:", data);
+    });
+
+    socket.on("error_message", (data) => {
+      alert("❌ Error: " + data.message);
+    });
+
+    function appendMessage(msg) {
+      const chat = document.getElementById("chat");
+      const p = document.createElement("p");
+      p.textContent = msg;
+      chat.appendChild(p);
+      chat.scrollTop = chat.scrollHeight;
+    }
+  </script>
+</body>
+</html>

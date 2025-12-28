@@ -1,0 +1,24 @@
+const mongoose = require("mongoose");
+const searchSchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  images: { type: [String], required: true },
+  details: { type: String, required: true },
+  contactMethods: {
+    type: [String],
+    enum: ["whatsapp", "call", "inAppChat"],
+    required: true,
+  },
+  price:{type:Number},
+  cityId:{type:mongoose.Schema.Types.ObjectId,required:true,ref:"City"},
+  phoneNumber: { type: String },
+  postNumber:{type:Number},
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true
+  },
+  status: { type: String, enum: ["pending", "accepted", "refused"], default: "pending" }
+}, { timestamps: true });
+
+const Search = mongoose.model("Search", searchSchema);
+module.exports = Search;
