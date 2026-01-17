@@ -31,9 +31,8 @@ const register = async (req, res, next) => {
     const lang = req.headers['accept-language'] || 'en';
     const messages = getMessages(lang);
 
-    const token = req.headers.authorization?.split(" ")[1];
-    decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const { identifier } = decoded;
+     
+    
     const { password, phone, role } = req.body;
     console.log(req.body)
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -128,6 +127,8 @@ const addLocationForProvider = async (req, res, next) => {
 }
 const login = async (req, res, next) => {
   try {
+
+    
     const lang = req.headers['accept-language'] || 'en';
     const messages = getMessages(lang);
 
@@ -210,7 +211,7 @@ const login = async (req, res, next) => {
     // ----------------------
     if (role === "serviceProvider") {
       const existServiceProvider = await serviceProvider.findOne({ phone, isDeleted: false });
-
+ 
       if (existServiceProvider) {
         // التحقق من حالة الطلب
         if (existServiceProvider.status === "refused") {
@@ -305,15 +306,16 @@ const login = async (req, res, next) => {
     }
 
 
-
-
-
-
     // ----------------------
     // الحالة: User
     // ----------------------
     if (role === "user") {
-      const existUser = await User.findOne({ phone, isDeleted: false }).populate("categoryCenterId");
+      // const existUser = await User.findOne({ phone, isDeleted: false });//.populate("categoryCenterId");
+     
+     
+      const existUser = await User.findOne({ phone, $or: [{ isDeleted: false },{ isDeleted: { $exists: false } } ]  }).populate("categoryCenterId");
+     return res.status(200).send({existUser});
+
       if (!existUser) {
         return res.status(400).send({
           status: false,
@@ -322,6 +324,7 @@ const login = async (req, res, next) => {
         });
       }
       const userAsRentalOffice = await rentalOffice.findOne({ phone })
+   
 
       const match = await bcrypt.compare(password, existUser.password);
       if (!match) {

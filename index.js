@@ -106,7 +106,8 @@ const authenticateToken = (req, res, next) => {
     req.originalUrl.includes("images")||
     req.originalUrl.includes("request-reset-password")||
     req.originalUrl.includes("reset-password")||
-    req.originalUrl.includes("logout")
+    req.originalUrl.includes("logout")||
+    req.originalUrl.includes("register")
 
   ) {
     return next(); // Skip auth for public routes
@@ -116,7 +117,7 @@ const authenticateToken = (req, res, next) => {
   if (!token) return res.status(401).send({ message: "No token provided" });
 
   try {
-    const decoded = jwt.verify(token, "mysecret");
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;
     next();
   } catch (err) {

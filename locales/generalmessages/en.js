@@ -64,11 +64,13 @@ invalid:{
   removeLike: "Tweet unliked"
 },
 sendCode: {
-  success: "The code has been sent to this number and will be valid for 5 minutes"
+  success: "The code has been sent to this number and will be valid for 5 minutes",
+  text: "Your verification code is:"
 },
 verify: {
   success: "Verification successful",
   error: "The code is incorrect",
+  expired: "Verification code has expired",
   notExist:"This code is invalid. Please enter your phone number to receive a new code via SMS"
 },
 contactus:{
