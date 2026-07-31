@@ -48,13 +48,14 @@ const addTweet = async (req, res, next) => {
 
 
     }
+    
 
     // ⬅️ الحفظ في قاعدة البيانات
     const tweet = await Tweet.create({
       content,
       title,
       userId: id,
-      image: imageUrl,
+      images: imageUrl,
     });
 
     return res.status(200).send({
@@ -180,7 +181,8 @@ const tweetsWithFullCommentCount = async (req, res, next) => {
           images: 1,
           video: 1,
           createdAt: 1,
-          totalComments: {
+          totalComments: 
+          {
             $add: [
               { $ifNull: [{ $size: "$comments" }, 0] },
               { $ifNull: [{ $size: "$replies" }, 0] },
@@ -233,14 +235,14 @@ const getTweetById = async (req, res, next) => {
     const lang = req.headers['accept-language'] || 'en';
     const userId = req.user.id;
 
-    if (!mongoose.Types.ObjectId.isValid(tweetId)) {
+    if (!mongoose.Types.ObjectId.isValid(tweetId)) 
+    {
       return res.status(400).send({
         code: 400,
         status: false,
         message: lang === "en" ? "Tweet ID is not valid" : "معرف التويت غير صحيح",
       });
     }
-
     const result = await Tweet.aggregate([
       {
         $match: { _id: new mongoose.Types.ObjectId(tweetId) },

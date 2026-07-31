@@ -21,31 +21,32 @@ const Reel = require("../models/reels");
 const Search = require("../models/searchForAnyThing");
 const mongoose = require("mongoose");
 const Favorite = require("../models/favorite");
+const { order } = require("../locales/generalmessages/en");
 const addPost = async (req, res, next) => {
   try {
     const lang = req.headers["accept-language"] || "en";
     const BASE_URL = process.env.BASE_URL || "http://localhost:3000";
     const userId = req.user.id
-    const images = req.files.images;
-    const video = req.files.video;
+    const images = req.files?.images || []; 
+    const video = req.files?.video || [];
 
-    if (!images || images.length === 0) {
-      return res.status(400).send({
-        status: false,
-        code: 400,
-        message: lang === "en" ? "Images are required" : "الصور مطلوبة"
-      });
-    }
+    // if (!images || images.length === 0) {
+    //   return res.status(400).send({
+    //     status: false,
+    //     code: 400,
+    //     message: lang === "en" ? "Images are required" : "الصور مطلوبة"
+    //   });
+    // }
 
-    if (video && video.length > 1) {
-      return res.status(400).send({
-        status: false,
-        code: 400,
-        message: lang === "en"
-          ? "Only one video is allowed"
-          : "مسموح برفع فيديو واحد فقط"
-      });
-    }
+    // if (video && video.length > 1) {
+    //   return res.status(400).send({
+    //     status: false,
+    //     code: 400,
+    //     message: lang === "en"
+    //       ? "Only one video is allowed"
+    //       : "مسموح برفع فيديو واحد فقط"
+    //   });
+    // }
     const { lat, long } = req.body;
 
     if (!lat || !long) {
@@ -101,7 +102,8 @@ const addPost = async (req, res, next) => {
       await Reel.create({
         video: post.video,
         discription: post.description,
-        createdBy: post.userId
+        createdBy: post.userId,
+        orderId: post._id
       });
     }
 
@@ -127,7 +129,7 @@ const getPostsByMainCategory = async (req, res, next) => {
     // 🟢 location params
     const longitude = parseFloat(req.query.long);
     const latitude = parseFloat(req.query.lat);
-    const radiusKm = 5; // ثابت = 5 كم
+    const radiusKm = 1000; // ثابت = 5 كم
 
     // 🟢 الفلتر الأساسي
     let matchFilter = { mainCategoryId: new mongoose.Types.ObjectId(categoryId) };
@@ -573,7 +575,7 @@ const getProfilePosts = async (req, res, next) => {
         const user =
           type === "Post"
             ? post.userId
-            : type === "ShowRoomPost"
+            : type === "ShowRoomPosts"
               ? post.showroomId
               : post.userId;
 
@@ -604,7 +606,7 @@ const getProfilePosts = async (req, res, next) => {
     // 🟢 combine & paginate
     const allPosts = [
       ...formatData(posts, "Post"),
-      ...formatData(showroomPosts, "ShowRoomPost"),
+      ...formatData(showroomPosts, "ShowRoomPosts"),
       ...formatData(searchPosts, "Search"),
     ];
     // 🟢 لو عنده خدمة، نجيب المتوسط من RatingCenter
@@ -657,8 +659,8 @@ const deleteProfilePost = async (req, res, next) => {
   try {
     const { type, id } = req.body;
     const userId = req.user.id;
-    console.log(userId)
     const lang = req.headers["accept-language"] || "en";
+
     if (!type || !id) {
       return res.status(400).json({ success: false, message: "Type and ID are required" });
     }
@@ -666,21 +668,11 @@ const deleteProfilePost = async (req, res, next) => {
     // 🟢 تحديد الموديل حسب النوع
     let Model;
     switch (type) {
-      case "Post":
-        Model = Post;
-        break;
-      case "ShowRoomPost":
-        Model = ShowRoomPost;
-        break;
-      case "Search":
-        Model = Search;
-        break;
-      case "Service":
-        Model = Service;
-        break;
-      case "Tweet":
-        Model = Tweet;
-        break;
+      case "Post": Model = Post; break;
+      case "ShowRoomPosts": Model = ShowRoomPost; break;
+      case "Search": Model = Search; break;
+      case "Service": Model = Service; break;
+      case "Tweet": Model = Tweet; break;
       default:
         return res.status(400).send({
           status: false,
@@ -689,42 +681,37 @@ const deleteProfilePost = async (req, res, next) => {
         });
     }
 
-    // 🟢 التأكد إن البوست تابع للمستخدم
-    let query = {}
+    // 🟢 تحضير كويري التحقق من الملكية
+    let query = { _id: new mongoose.Types.ObjectId(id) };
     if (type === "Service") {
-      query = { _id: id, centerId: userId }
+      query.centerId = new mongoose.Types.ObjectId(userId);
+    } else if (type === "ShowRoomPosts") {
+      query.showroomId = new mongoose.Types.ObjectId(userId);
+    } else {
+      query.userId = new mongoose.Types.ObjectId(userId);
     }
-    else if (type === "ShowRoomPost") {
-      query = { _id: id, showroomId: userId };
-    }
-    else {
-      query = { _id: id, userId: userId };
-    }
-    const post = await Model.findOne(query);
-    /*const post = await Model.findOne(query);*/
+
+    // 🟢 1. الحذف الفعلي للبوست وجلب بياناته لمسح الصور
+    // استخدمنا findOneAndDelete مرة واحدة فقط وهي تكفي للحذف والتحقق
+    const post = await Model.findOneAndDelete(query);
+
     if (!post) {
-      return res.status(400).send({
+      return res.status(404).send({
         status: false,
-        code: 400,
-        message: lang === "ar"
-          ? "المنشور غير موجود أو ليس لديك صلاحية لحذفه"
-          : "Post not found or not authorized to delete"
+        message: lang === "ar" ? "المنشور غير موجود أو ليس لديك صلاحية" : "Post not found"
       });
     }
+
+    // 🟢 2. معالجة حذف الصور بناءً على النوع
     if (type === "Service") {
-      // الصور داخل products
       if (post.products && Array.isArray(post.products)) {
         for (const p of post.products) {
           if (p.image) deleteImage(p.image);
         }
       }
     } else if (type === "Tweet") {
-      // Tweet عنده صورة واحدة فقط
-      if (post.image) {
-        deleteImage(post.image);
-      }
+      if (post.image) deleteImage(post.image);
     } else {
-      // باقي الأنواع عندها images array
       if (post.images && Array.isArray(post.images)) {
         for (const img of post.images) {
           deleteImage(img);
@@ -732,29 +719,27 @@ const deleteProfilePost = async (req, res, next) => {
       }
     }
 
-    // 🟢 حذف البوست نفسه
-    await Model.deleteOne({ _id: id });
-
-    // 🟢 حذف التعليقات والردود المرتبطة
+    // 🟢 3. حذف التعليقات والردود المرتبطة (بانتظار كامل AWAIT)
     if (type === "Tweet") {
-      // تعليقات وردود tweet
       const comments = await Comments.find({ tweetId: id });
       const commentIds = comments.map((c) => c._id);
 
-      await Comments.deleteMany({ tweetId: id });
-      await ReplyOnComments.deleteMany({ commentId: { $in: commentIds } });
+      await Promise.all([
+        Comments.deleteMany({ tweetId: id }),
+        ReplyOnComments.deleteMany({ commentId: { $in: commentIds } })
+      ]);
     } else {
-      // باقي الأنواع (CenterComments و Reply)
       const entityType = type === "Service" ? "User" : type;
-
       const comments = await Comment.find({ entityId: id, entityType });
       const commentIds = comments.map((c) => c._id);
 
-      await Comment.deleteMany({ entityId: id, entityType });
-      await Reply.deleteMany({ commentId: { $in: commentIds } });
+      await Promise.all([
+        Comment.deleteMany({ entityId: id, entityType }),
+        Reply.deleteMany({ commentId: { $in: commentIds } })
+      ]);
     }
 
-    // ✅ الرد النهائي
+    // ✅ الرد النهائي بعد التأكد من مسح كل شيء من القاعدة
     return res.status(200).send({
       status: true,
       code: 200,
@@ -762,6 +747,7 @@ const deleteProfilePost = async (req, res, next) => {
         ? `${type} تم حذفه بنجاح مع الصور والتعليقات والردود المرتبطة.`
         : `${type} deleted successfully along with local images, comments, and replies.`
     });
+
   } catch (err) {
     next(err);
   }
@@ -778,7 +764,7 @@ const updateEntityByType = async (req, res, next) => {
       case "Post":
         Model = Post;
         break;
-      case "ShowRoomPost":
+      case "ShowRoomPosts":
         Model = ShowRoomPost;
         break;
       case "Service":
@@ -813,7 +799,7 @@ const updateEntityByType = async (req, res, next) => {
     let ownerId;
     if (type === "Service") {
       ownerId = existingDoc.centerId?.toString();
-    } else if (type === "ShowRoomPost") {
+    } else if (type === "ShowRoomPosts") {
       ownerId = existingDoc.showroomId?.toString();
     } else {
       ownerId = existingDoc.userId?.toString();
@@ -937,7 +923,7 @@ const updateCreatedAt = async (req, res, next) => {
         Model = Post;
         ownerField = "userId";
         break;
-      case "ShowRoomPost":
+      case "ShowRoomPosts":
         Model = ShowRoomPost;
         ownerField = "showroomId";
         break;
@@ -1058,7 +1044,7 @@ const getEntityByTypeAndId = async (req, res, next) => {
         ];
         break;
 
-      case "ShowRoomPost":
+      case "ShowRoomPosts":
         Model = ShowRoomPost;
         unSelectFields = "-postNumber -createdAt -updatedAt -__v -showroomId";
         populateOptions = [
@@ -1226,15 +1212,6 @@ const getNumberOfPostsWithStatus = async (req, res, next) => {
     next(err);
   }
 }
-
-
-
-
-
-
-
-
-
 
 
 module.exports = {

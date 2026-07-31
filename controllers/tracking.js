@@ -18,10 +18,11 @@ const startTracking = (req, res) => {
 };
 
 // === API: End Tracking ===
-const endTracking = (req, res) => {
+const endTracking = (req, res, next) => {
     try {
         const userId = req.user.id;
         activeSessions.delete(userId); // إيقاف الإرسال
+        lang = req.headers["accept-language"] || "en";
         res.send({ 
             status:true,
             code:200,

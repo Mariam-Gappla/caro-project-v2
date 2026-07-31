@@ -1,13 +1,18 @@
-const db = require("../configration/firebase");
 const User = require("../models/user");
-const { sendNotification } = require("../configration/firebase.js");
+const {db, sendNotification } = require("../configration/firebase.js");
+const serviceProvider = require("../models/serviceProvider.js");
 const addMessage = async (req, res, next) => {
     try {
         const lang = req.headers['accept-language'] || 'en';
         const { senderId, receiverId, text } = req.body;
-        const receiver = await User.findById(req.body.receiverId);
-        const sender = await User.findById(req.body.senderId);
+        
+        console.log("📩 Body:", req.body);
+        console.log("📩 senderId:", senderId);
+        console.log("📩 receiverId:", receiverId);
+        console.log("📩 text:", text);
+
         if (!senderId || !receiverId || !text) {
+            console.log("❌ Missing fields");
             return res.status(400).send({
                 status: false,
                 code: 400,
@@ -15,6 +20,17 @@ const addMessage = async (req, res, next) => {
             });
         }
 
+        const receiver = await User.findById(receiverId) || 
+                 await serviceProvider.findById(receiverId);
+        const sender = await User.findById(senderId) || 
+                 await serviceProvider.findById(senderId);
+        console.log("👤 Sender:", sender ? sender.username : "NOT FOUND");
+        console.log("👤 Receiver:", receiver ? receiver.username : "NOT FOUND");
+        console.log("🔑 Receiver FCM:", receiver?.fcmToken || "NO TOKEN");
+
+        if (!receiver || !sender) {
+            return res.status(404).send({ message: "Users not found" });
+        }
         const conversationId =
             senderId < receiverId
                 ? `${senderId}_${receiverId}`
@@ -41,19 +57,21 @@ const addMessage = async (req, res, next) => {
             lastMessageTime: newMessage.createdAt,
         };
 
+
         await db.ref().update(updates);
-        // 🔔 إرسال إشعار للمستقبل
+        console.log(`🔔 Attempting to send notification to: ${receiver.username}`);
+
         await sendNotification({
             target: receiver,
             targetType: "User",
             titleAr: `رسالة جديدة من ${sender.username}`,
             titleEn: `New message from ${sender.username}`,
-            messageAr:
-                text.length > 50
-                    ? `${text.slice(0, 50)}...`
-                    : text,
-            lang: lang, // لو عندك حقل لغة للمستخدم
-            actionType: "message",
+            messageAr: text.length > 50 ? `${text.slice(0, 50)}...` : text,
+            messageEn: text.length > 50 ? `${text.slice(0, 50)}...` : text,
+            lang: String(lang),
+            actionType: "message",   
+            senderId: String(senderId),
+            request: "false"
         });
 
         res.status(200).send({
@@ -64,6 +82,7 @@ const addMessage = async (req, res, next) => {
 
         });
     } catch (err) {
+                console.error("❌ Error:", err.message);
         next(err)
     }
 
@@ -100,6 +119,14 @@ const getConversations = async (req, res, next) => {
         const usersMap = {};
         users.forEach((u) => {
             usersMap[u._id.toString()] = u;
+        });
+        const providers = await serviceProvider.find(
+            { _id: { $in: otherUserIds } },
+            "username image"
+        ).lean();
+            
+        providers.forEach((p) => {
+            usersMap[p._id.toString()] = p;
         });
 
         const result = await Promise.all(

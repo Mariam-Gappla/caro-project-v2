@@ -25,13 +25,19 @@ const placeBid = async (req, res, next) => {
                     : "Insufficient balance to place bid",
             });
         }
+        // let modelResult;
+        // if (targetType == "Car") {
+        //     modelResult = await Car.findOne({ _id: targetId })
+        // }
+        // else if (targetType == "CarPlate") {
+        //     modelResult = await Car.findOne({ _id: targetId })
+        // }
         let modelResult;
-        if (targetType == "Car") {
-            modelResult = await Car.findOne({ _id: targetId })
-        }
-        else if (targetType == "CarPlate") {
-            modelResult = await Car.findOne({ _id: targetId })
-        }
+if (targetType === "Car") {
+    modelResult = await Car.findById(targetId);
+} else if (targetType === "CarPlate") {
+    modelResult = await CarPlate.findById(targetId); // 👈 تصحيح الموديل هنا
+}
         // 2️⃣ البحث عن المزاد الحالي على العنصر
         let auction = await AuctionOrder.findOne({
             targetId,
@@ -108,14 +114,15 @@ const placeBid = async (req, res, next) => {
             : await CarPlate.findById(targetId);
 
         const ownerUser = await User.findById(result.userId);
-
+        
+        const bidderUser = await User.findById(userId);
         await sendNotification({
             target: ownerUser,
             targetType: "User",
             titleAr: "طلب جديد",
             titleEn: "New Order",
-            messageAr: `لقد تلقيت طلبًا جديدًا من المستخدم ${ownerUser.username || 'عميل'}.`,
-            messageEn: `You have received a new order from ${ownerUser.username || 'a customer'}.`,
+            messageAr: `لقد تلقيت طلبًا جديدًا من المستخدم ${bidderUser.username || 'عميل'}.`,
+            messageEn: `You have received a new order from ${bidderUser.username || 'a customer'}.`,
             actionType: "order",
             orderId: auction._id,
             request: true,
@@ -180,7 +187,6 @@ const addOrder = async (req, res, next) => {
             actionType: "order",
             orderId: auction._id,
             request: true,
-            request: true,
             type:"auction",
             orderModel: "AuctionOrder",
             lang,
@@ -219,12 +225,17 @@ const acceptOrRefusedAuctionOrder = async (req, res, next) => {
                 message: lang === "ar" ? "الطلب غير موجود" : "Order not found",
             });
         }
-
+        const notification = await Notification.findOne({ orderId: orderId, orderModel: "AuctionOrder" });
+        
         // 3️⃣ تحديث الحالة
         if (status === "accepted") {
             order.status = "accepted";
             const notification = await Notification.findOne({ orderId: orderId, orderModel: "AuctionOrder", })
-            notification.action = true;
+            // notification.action = true;
+            if (notification) {
+    notification.action = (status === "accepted");
+    await notification.save();
+}
             await notification.save();
             if (targetType == "Car") {
                 await Car.findOneAndUpdate({ _id: order.targetId }, { ended: true });

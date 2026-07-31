@@ -13,6 +13,21 @@ const validateMembership = (lang = "en") => {
                 "string.base": messages.titleAr,
             }),
         }),
+        price: Joi.number().positive().required().messages({
+            "any.required": lang === "ar" ? "السعر مطلوب" : "Price is required",
+            "number.base": lang === "ar" ? "يجب أن يكون السعر رقماً" : "Price must be a number",
+            "number.positive": lang === "ar" ? "يجب أن يكون السعر رقماً موجباً" : "Price must be a positive number",
+        }),
+
+        // 2. إضافة التحقق من مدة الاشتراك
+        duration: Joi.object({
+            en: Joi.string().required().messages({
+                "any.required": lang === "ar" ? "المدة بالإنجليزية مطلوبة" : "Duration in English is required",
+            }),
+            ar: Joi.string().required().messages({
+                "any.required": lang === "ar" ? "المدة بالعربية مطلوبة" : "Duration in Arabic is required",
+            }),
+        }),
 
         benefits: Joi.object({
             en: Joi.array().items(Joi.string().required()).min(1).required().messages({

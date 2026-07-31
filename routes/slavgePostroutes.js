@@ -8,4 +8,4 @@ router.post("/",upload.fields([
 router.post("/end/:id",endPost);
 router.get("/:id", getPostById)
 router.get("/",getPosts)
-module.exports=router;
+module.exports=router; 

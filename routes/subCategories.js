@@ -9,11 +9,4 @@ router.get("/subCategoriesInMain/:id",getSubCategoriesInMainCategory)
 
 
 
-
-
-
-
-
-
-
 module.exports=router

@@ -27,14 +27,8 @@ const registerSchema = (lang = "en") => {
       'any.required': messages.register.confirmPassword.required
     }),
 
-    role: joi.string()
-      .valid("rentalOffice", "serviceProvider", "user")
-      .required()
-      .messages({
-        'any.only': messages.register.role.required,
-        'string.empty': messages.register.role.required,
-        'any.required': messages.register.role.valid
-      })
+role: joi.string().optional()
+      
   });
 }
 const loginSchema = (lang = "en") => {
@@ -53,14 +47,7 @@ const loginSchema = (lang = "en") => {
       'string.empty': messages.login.fcmToken.required,
       'any.required': messages.login.fcmToken.required
     }),
-    role: joi.string()
-      .valid("rentalOffice", "serviceProvider", "user")
-      .required()
-      .messages({
-        'any.only': messages.login.role.valid,
-        'string.empty': messages.login.role.required,
-        'any.required': messages.login.role.required
-      })
+    role: joi.string().optional()
   });
 }
 const registerProviderSchema=(lang="en")=>{

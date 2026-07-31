@@ -15,6 +15,8 @@ const postSchema = new mongoose.Schema({
             type: [Number], // [longitude, latitude]
         },
     },
+    car_type: { type: String }, 
+    car_model: { type: String },
     priceType: { type: String, enum: ["fixed", "negotiable", "best"], default: "fixed", required: true },
     price: { type: Number },
     contactType: {
@@ -41,7 +43,7 @@ const postSchema = new mongoose.Schema({
     status: {
       type: String,
       enum: ['pending', 'accepted', 'refused'],
-      default: 'pending',
+      default: 'accepted',
     },
 }, { timestamps: true });
 postSchema.index({ location: "2dsphere" });

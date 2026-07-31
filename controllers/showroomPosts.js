@@ -7,17 +7,23 @@ const Reel = require("../models/reels");
 const Wallet = require("../models/wallet");
 const User = require("../models/user");
 const { sendNotification } = require("../configration/firebase.js");
+const { default: mongoose } = require("mongoose");
 const addShowroomPost = async (req, res, next) => {
   try {
     const lang = req.headers["accept-language"] || "en";
     const BASE_URL = process.env.BASE_URL || 'http://localhost:3000/';
-    // ✅ نتأكد إن services و advantages Arrays
-    if (req.body.services && !Array.isArray(req.body.services)) {
-      req.body.services = [req.body.services];
-    }
+    Object.keys(req.body).forEach(key => {
+      if (req.body[key] === "" || req.body[key] === "null" || req.body[key] === "undefined") {
+        delete req.body[key];
+      }
+    });
+
+    // 2️⃣ التأكد من الـ Arrays ( advantages )
     if (req.body.advantages && !Array.isArray(req.body.advantages)) {
       req.body.advantages = [req.body.advantages];
     }
+
+    // 3️⃣ تنفيذ الـ Validation (Joi)
     const { error } = showroomPostSchema(lang).validate(req.body);
     if (error) {
       return res.status(400).send({
@@ -26,6 +32,14 @@ const addShowroomPost = async (req, res, next) => {
         message: error.details[0].message
       });
     }
+    // ✅ نتأكد إن services و advantages Arrays
+    if (req.body.services && !Array.isArray(req.body.services)) {
+      req.body.services = [req.body.services];
+    }
+    if (req.body.advantages && !Array.isArray(req.body.advantages)) {
+      req.body.advantages = [req.body.advantages];
+    }
+
 
     if (!req.files || !req.files.images || req.files.images.length === 0) {
       return res.status(400).send({
@@ -61,7 +75,8 @@ const addShowroomPost = async (req, res, next) => {
       await Reel.create({
         video: showroom.video,
         discription: showroom.discription,
-        createdBy: showroom.showroomId
+        createdBy: showroom.showroomId,
+        orderId: post._id
       });
     }
 
@@ -89,19 +104,23 @@ const getShowroomPosts = async (req, res, next) => {
     const showroom = await User.findById(showroomId);
 
     // 🟢 فلترة ديناميكية
-    const filteration = { showroomId: showroomId };
-
+    const filteration = { showroomId: new mongoose.Types.ObjectId(showroomId) };
+    
     // لو المستخدم مش صاحب المعرض → فلتر ended:false
     if (!userId || userId.toString() !== showroomId.toString()) {
       filteration.ended = false;
     }
 
     // باقي الفلاتر
-    if (req.query.cityId) filteration.cityId = req.query.cityId;
-    if (req.query.carNameId) filteration.carNameId = req.query.carNameId;
-    if (req.query.carConditionId) filteration.carConditionId = req.query.carConditionId;
-    if (req.query.fuelTypeId) filteration.fuelTypeId = req.query.fuelTypeId;
-    if (req.query.deliveryOptionId) filteration.deliveryOptionId = req.query.deliveryOptionId;
+    if (req.query.cityId) filteration.cityId = new mongoose.Types.ObjectId(req.query.cityId);
+    if (req.query.carNameId) {
+      filteration.carNameId = new mongoose.Types.ObjectId(req.query.carNameId);
+    }
+    if (req.query.carConditionId) {
+      filteration.carConditionId = new mongoose.Types.ObjectId(req.query.carConditionId);
+    }
+    if (req.query.fuelTypeId) filteration.fuelTypeId = new mongoose.Types.ObjectId(req.query.fuelTypeId);
+    if (req.query.deliveryOptionId) filteration.deliveryOptionId = new mongoose.Types.ObjectId (req.query.deliveryOptionId);
 
     // 🟢 query مع الفلترة
     const showroomPosts = await ShowRoomPosts.find(filteration)
@@ -155,19 +174,18 @@ const getPostById = async (req, res, next) => {
     const lang = req.headers["accept-language"] || "en";
     const postId = req.params.id;
 
+    // 🟢 البحث بالـ ID فقط مع عمل Populate لكل الحقول المطلوبة
     const post = await ShowRoomPosts.findById(postId)
+      .populate("transmissionTypeId")
+      .populate("carConditionId")
       .populate("carNameId")
       .populate("carModelId")
       .populate("carTypeId")
-      .populate("cityId")
-      .populate("transmissionTypeId")
       .populate("fuelTypeId")
-      .populate("carBodyId")
       .populate("cylindersId")
-      .populate("carConditionId")
+      .populate("cityId")
       .populate("deliveryOptionId")
-      .populate("advantages")
-      .lean();
+      .populate("advantages"); // تأكد من عمل بوبيوليت للميزات
 
     if (!post) {
       return res.status(404).send({
@@ -177,7 +195,7 @@ const getPostById = async (req, res, next) => {
       });
     }
 
-    // ✅ Format output
+    // ✅ تنسيق البيانات (Format output)
     const formatedPost = {
       id: post._id,
       createdAt: post.createdAt,
@@ -195,51 +213,50 @@ const getPostById = async (req, res, next) => {
       interiorColor: post.interiorColor,
       exteriorColor: post.exteriorColor,
 
-      // ✅ كل populate يكون فيه id + text
+      // الـ Populate مع التعامل مع النصوص واللغات
       year: post.carModelId
-        ? { id: post.carModelId._id, text: post.carModelId.model?.[lang] }
-        : "",
+        ? { id: post.carModelId._id, text: post.carModelId.model?.[lang] || post.carModelId.model?.ar }
+        : null,
 
       fuelType: post.fuelTypeId
-        ? { id: post.fuelTypeId._id, text: post.fuelTypeId.name?.[lang] }
-        : "",
+        ? { id: post.fuelTypeId._id, text: post.fuelTypeId.name?.[lang] || post.fuelTypeId.name?.ar }
+        : null,
 
       cylinders: post.cylindersId
-        ? { id: post.cylindersId._id, text: post.cylindersId.name?.[lang] || String(post.cylindersId.name) }
-        : "",
+        ? { 
+            id: post.cylindersId._id, 
+            text: lang === "ar" ? post.cylindersId.nameAr : post.cylindersId.nameEn 
+          }
+        : null,
 
       carCondition: post.carConditionId
-        ? { id: post.carConditionId._id, text: post.carConditionId.name?.[lang] }
-        : "",
+        ? { id: post.carConditionId._id, text: post.carConditionId.name?.[lang] || post.carConditionId.name?.ar }
+        : null,
 
       transmissionType: post.transmissionTypeId
-        ? { id: post.transmissionTypeId._id, text: post.transmissionTypeId.name?.[lang] }
-        : "",
+        ? { id: post.transmissionTypeId._id, text: post.transmissionTypeId.name?.[lang] || post.transmissionTypeId.name?.ar }
+        : null,
 
       carType: post.carTypeId
-        ? { id: post.carTypeId._id, text: post.carTypeId.type?.[lang] }
-        : "",
+        ? { id: post.carTypeId._id, text: post.carTypeId.type?.[lang] || post.carTypeId.type?.ar }
+        : null,
 
       carName: post.carNameId
-        ? { id: post.carNameId._id, text: post.carNameId.carName?.[lang] }
-        : "",
+        ? { id: post.carNameId._id, text: post.carNameId.carName?.[lang] || post.carNameId.carName?.ar }
+        : null,
 
       city: post.cityId
-        ? { id: post.cityId._id, text: post.cityId.name?.[lang] }
-        : "",
-
-      carBody: post.carBodyId
-        ? { id: post.carBodyId._id, text: post.carBodyId.name?.[lang] }
-        : "",
+        ? { id: post.cityId._id, text: post.cityId.name?.[lang] || post.cityId.name?.ar }
+        : null,
 
       services: post.deliveryOptionId
-        ? { id: post.deliveryOptionId._id, text: post.deliveryOptionId.name?.[lang] }
-        : "",
+        ? { id: post.deliveryOptionId._id, text: post.deliveryOptionId.name?.[lang] || post.deliveryOptionId.name?.ar }
+        : null,
 
       advantages: post.advantages?.map(a => ({
         id: a._id,
-        text: a.name?.[lang]
-      })),
+        text: a.name?.[lang] || a.name?.ar
+      })) || [],
 
       showroomId: post.showroomId,
     };
@@ -247,10 +264,7 @@ const getPostById = async (req, res, next) => {
     return res.status(200).send({
       status: true,
       code: 200,
-      message:
-        lang === "en"
-          ? "Post retrieved successfully"
-          : "تم استرجاع المنشور بنجاح",
+      message: lang === "en" ? "Post retrieved successfully" : "تم استرجاع المنشور بنجاح",
       data: formatedPost,
     });
   } catch (error) {

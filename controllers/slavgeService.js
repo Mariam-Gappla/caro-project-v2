@@ -45,7 +45,7 @@ const getSlaveServices = async (req, res, next) => {
         return res.status(200).send({
             status: true,
             code: 200,
-            message: lang === "ar" ? "تم جلب المدن بنجاح" : "cities fetched successfully",
+            message: lang === "ar" ? "تم جلب الخدمات بنجاح" : "Services fetched successfully",
             areas: formattedServices
         });
     }
@@ -53,7 +53,33 @@ const getSlaveServices = async (req, res, next) => {
         next(err)
     }
 }
+
+const deleteSlavgeService = async (req, res, next) => {
+    try {
+        const lang = req.headers['accept-language'] || 'en';
+        const { id } = req.params;
+
+        const deletedService = await SlavgeService.findByIdAndDelete(id);
+
+        if (!deletedService) {
+            return res.status(404).send({
+                status: false,
+                code: 404,
+                message: lang === "ar" ? "الخدمة غير موجودة" : "Service not found"
+            });
+        }
+
+        return res.status(200).send({
+            status: true,
+            code: 200,
+            message: lang === "ar" ? "تم حذف الخدمة بنجاح" : "Service deleted successfully"
+        });
+    } catch (err) {
+        next(err);
+    }
+};
 module.exports = {
     addSlavgeService,
-    getSlaveServices
+    getSlaveServices,
+    deleteSlavgeService
 }

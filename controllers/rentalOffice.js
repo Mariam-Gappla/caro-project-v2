@@ -1,4 +1,5 @@
 const rentalOffice = require("../models/rentalOffice");
+const StoreVisitor = require("../models/StoreVisitor");
 const getMessages = require("../configration/getmessages")
 const followersForRentalOffice = require("../models/followersForRentalOffice");
 const User=require("../models/user");
@@ -12,6 +13,7 @@ const carRental = require("../models/carRental");
 const Rating = require("../models/ratingPost");
 const Name = require("../models/carName");
 const Model = require("../models/carModel");
+const CarType = require("../models/carType");
 const getAllRentallOffice = async (req, res, next) => {
   try {
     const lang = req.headers["accept-language"] || "en";
@@ -79,12 +81,16 @@ const getAllRentallOffice = async (req, res, next) => {
         .limit(limit);
     }
 
-    // 🎯 هات التقييمات لمكاتب التأجير فقط
-    const ratings = await Rating.aggregate([
-      { $match: { entityType: "rentalOffice" } },
+// 🎯 جلب التقييمات بناءً على مسميات السكيما (targetType & targetId)
+    const ratings = await ratingForOrder.aggregate([
+      { 
+        $match: { 
+          targetType: "rentalOffice" // تأكد أنها تطابق الـ enum في السكيما
+        } 
+      },
       {
         $group: {
-          _id: "$entityId",
+          _id: "$targetId", // استخدمنا targetId حسب السكيما
           avgRating: { $avg: "$rating" },
           count: { $sum: 1 },
         },
@@ -94,10 +100,12 @@ const getAllRentallOffice = async (req, res, next) => {
     // 🗺️ خريطة للتقييمات
     const ratingMap = {};
     ratings.forEach((r) => {
-      ratingMap[r._id.toString()] = {
-        avgRating: r.avgRating,
-        count: r.count,
-      };
+      if (r._id) {
+        ratingMap[r._id.toString()] = {
+          avgRating: r.avgRating || 0,
+          count: r.count || 0,
+        };
+      }
     });
 
     const formattedOffices = await Promise.all(
@@ -112,6 +120,27 @@ const getAllRentallOffice = async (req, res, next) => {
           userId,
         });
 
+        if (userId && userId !== o._id.toString()) {
+      try {
+        // محاولة إنشاء سجل زيارة (ستفشل تلقائياً لو زار المكتب مسبقاً)
+        await StoreVisitor.create({
+          storeId: o._id,
+          visitorId: userId
+        });
+
+        // إذا نجح الإنشاء (أول مرة)، نزيد العداد في الداتابيز
+        await rentalOffice.updateOne(
+          { _id: o._id },
+          { $inc: { storeVisitorsCount: 1 } }
+        );
+
+        // نحدث القيمة يدوياً في الكائن الحالي ليظهر في الرد (Response)
+        o.storeVisitorsCount = (o.storeVisitorsCount || 0) + 1;
+      } catch (err) {
+        // إذا كان Duplicate Key (زار مسبقاً) نتجاهل الخطأ
+      }
+    }
+
         return {
           id: o._id,
           username: o.username,
@@ -121,6 +150,7 @@ const getAllRentallOffice = async (req, res, next) => {
           rating: ratingMap[o._id.toString()]?.avgRating || 0,
           isFavorite: !!favorite,
           isFollowed: !!follow,
+          visitorsCount: o.storeVisitorsCount || 0
         };
       })
     );
@@ -180,7 +210,9 @@ const getRentalOfficeCar = async (req, res, next) => {
         console.log(car)
         const name = await Name.findOne({ _id: car.nameId });
         const model = await Model.findOne({ _id: car.modelId });
-
+        const type = await CarType.findOne({ _id: car.carTypeId }); 
+        const carModel = model ? (lang === "ar" ? model.model.ar : model.model.en) : "";
+        const carType = type ? (lang === "ar" ? type.type.ar : type.type.en) : ""; 
         let title;
         if (rentalType === "weekly/daily") {
           title =
@@ -190,6 +222,8 @@ const getRentalOfficeCar = async (req, res, next) => {
           return {
             id: car._id,
             title,
+            carModel,
+            carType,
             rentalType: "weekly/daily",
             images: car.images,
             carDescription: car.carDescription,
@@ -205,6 +239,8 @@ const getRentalOfficeCar = async (req, res, next) => {
           return {
             id: car._id,
             title,
+            carModel,
+            carType,
             rentalType: "rent to own",
             images: car.images,
             carDescription: car.carDescription,

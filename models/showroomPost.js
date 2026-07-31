@@ -3,15 +3,19 @@ const showroomPostsSchema = new mongoose.Schema({
   title: { type: String, required: true },
   images: { type: [String], required: true },
   video: { type: String },
-  deliveryOptionId: { type: mongoose.Schema.Types.ObjectId, ref: "DeliveryOption", required: true },
+  deliveryOptionId: { type: mongoose.Schema.Types.ObjectId, ref: "DeliveryOption", required: false },
   carNameId: { type: mongoose.Schema.Types.ObjectId, ref: "CarName", required: true },
   carModelId: { type: mongoose.Schema.Types.ObjectId, ref: "CarModel", required: true },
   carTypeId: { type: mongoose.Schema.Types.ObjectId, ref: "carType", required: true },
+  areaId: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'Area', // تأكد من اسم موديل المناطق عندك
+    required: true // خله false إذا كان اختياري
+  },
   cityId: { type: mongoose.Schema.Types.ObjectId, ref: "City", required: true },
   showroomId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   transmissionTypeId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: "Transmission" },
   fuelTypeId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: "FuelType" },
-  carBodyId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: "CarBody" },
   cylindersId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: "Cylinder" },
   carConditionId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: "Condition" },
   interiorColor: { type: String, required: true },

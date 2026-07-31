@@ -23,7 +23,6 @@ const messages = {
                 match: "Passwords must match"
             },
             role: {
-                required: "Role is required",
                 valid: "Role must be one of: rentalOffice, serviceProvider, or user"
             }
         },

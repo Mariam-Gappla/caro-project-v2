@@ -179,6 +179,8 @@ const carRentalWeeklyValiditionUpdateSchema = (lang = "en") => {
       'array.base': messages.images.base
     }),
 
+    title: Joi.string().optional(),
+
     carTypeId: Joi.string().optional().messages({
       'string.base': messages.carType.string,
     }),
@@ -216,25 +218,20 @@ const carRentalWeeklyValiditionUpdateSchema = (lang = "en") => {
     deliveryOption: Joi.boolean().messages({
       'boolean.base': messages.deliveryOption.boolean
     }),
-    imagesToDelete: Joi
-      .optional()
-      .messages({
-        imagesToDelete: Joi
-          .optional()
-          .messages({
-            'array.base': messages.imagesToDelete.base,
-            'string.uri': messages.imagesToDelete.uri
-          }),
-      }),
+imagesToDelete: Joi.array().items(Joi.string()).optional().messages({
+  'array.base': messages.imagesToDelete?.base,
+  'string.uri': messages.imagesToDelete?.uri
+}),
     nameId: Joi.string().required().messages({
       "string.base": messages.nameId.string,
     }),
     modelId: Joi.string().required().messages({
       "string.base": messages.modelId.string,
     }),
-    priceDay: {
-      "number.base": messages.priceDay.number,
-    }
+// التعديل المطلوب لسطر priceDay
+priceDay: Joi.number().optional().messages({
+  "number.base": messages.priceDay.number,
+}),
   });
 }
 const rentToOwnUpdateSchema = (lang = "en") => {
@@ -295,9 +292,7 @@ const rentToOwnUpdateSchema = (lang = "en") => {
     deliveryOption: Joi.boolean().messages({
       'boolean.base': messages.deliveryOption.boolean
     }),
-    imagesToDelete: Joi
-      .optional()
-      .messages({
+imagesToDelete: Joi.array().items(Joi.string()).optional().messages({
         'array.base': messages.imagesToDelete.base,
         'string.uri': messages.imagesToDelete.uri
       }),

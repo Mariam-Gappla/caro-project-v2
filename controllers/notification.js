@@ -131,11 +131,6 @@ const updateRead = async (req, res, next) => {
     next(err);
   }
 };
-
-
-
-
-
 module.exports = {
   getNotifications,
   addNotification,

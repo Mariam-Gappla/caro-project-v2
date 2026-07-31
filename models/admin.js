@@ -19,7 +19,7 @@ const adminSchema = new mongoose.Schema({
   },
   image: {
     type: String,
-    default: `${process.env.BASE_URL}images/rentalOffice.PNG`,
+    default: `${process.env.BASE_URL}/images/rentalOffice.PNG`,
   },
   resetOtp: {
     type: Number

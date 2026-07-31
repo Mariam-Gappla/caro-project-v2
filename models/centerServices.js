@@ -11,7 +11,7 @@ const centerServiceSchema = mongoose.Schema({
     services: [
         {
             type: mongoose.Schema.Types.ObjectId,
-            ref: "Service", // ربط مع Service
+            ref: "SubCategoryCenter", // ربط مع Service
         }
     ],
     products: {
@@ -37,6 +37,9 @@ const centerServiceSchema = mongoose.Schema({
         enum: ['pending', 'accepted', 'refused'],
         default: 'pending',
     },
-})
+
+},{ timestamps: true })
+
+centerServiceSchema.index({ location: "2dsphere" });
 const centerService = mongoose.model('CenterService', centerServiceSchema);
 module.exports = centerService;

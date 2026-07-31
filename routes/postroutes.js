@@ -22,10 +22,4 @@ router.get("/relevant/:id",getrelevantPosts);
 
 
 
-
-
-
-
-
-
 module.exports = router;

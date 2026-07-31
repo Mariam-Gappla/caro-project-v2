@@ -68,7 +68,8 @@ const addRatingForOrderToServiceProvider = async (req, res, next) => {
         const lang = req.headers['accept-language'] || 'en';
         const messages = getMessages(lang);
         const userId = req.user.id;
-        const { error } = ratingSchemaValidation.ratingSchemaValidation(lang).validate(req.body);
+        const { orderId, rating, comment } = req.body;
+        const { error } = ratingSchemaValidation.ratingSchemaValidation(lang).validate({ orderId, rating, comment });
         if (error) {
             return res.status(400).send({
                 status: false,
@@ -76,8 +77,14 @@ const addRatingForOrderToServiceProvider = async (req, res, next) => {
                 message: error.details[0].message
             });
         }
-        const { orderId, rating, comment } = req.body;
-        const existOrder = await serviceProviderOrders.findById(orderId)
+        const existOrder = await serviceProviderOrders.findById(orderId);
+        if (!existOrder) {
+            return res.status(400).send({
+                status: false,
+                code: 400,
+                message: messages.order.notExist
+            });
+        }
         if (!existOrder.providerId) {
             return res.status(400).send({
                 status: false,
@@ -85,18 +92,6 @@ const addRatingForOrderToServiceProvider = async (req, res, next) => {
                 message: lang == "en"
                     ? "The provider has not yet accepted the order. Please wait for approval."
                     : "لم يقم الموفر بعد بالموافقة على الطلب. يرجى الانتظار حتى تتم الموافقة"
-            });
-        }
-
-
-
-        console.log(existOrder);
-        if (!existOrder) {
-            return res.status(400).send({
-                status: false,
-                code: 400,
-                message: messages.order.notExist
-
             });
         }
         const existingRating = await review.findOne({ userId, orderId });
@@ -234,9 +229,38 @@ const getRatingByServiceProvider = async (req, res, next) => {
         next(error);
     }
 }
+const changePaymentStatus = async (req, res, next) => {
+  try {
+    const lang = req.headers['accept-language'] || 'en';
+    const userId = req.user.id; 
+    const { orderId } = req.body;
+
+    const order = await serviceProviderOrders.findOne({ _id: orderId, userId });
+    if (!order) {
+      return res.status(400).send({
+        status: false,
+        code: 400,
+        message: lang === 'ar' ? "الطلب غير موجود" : "Order not found"
+      });
+    }
+
+    order.paymentStatus = 'paid';
+    await order.save();
+
+    return res.status(200).send({
+      status: true,
+      code: 200,
+      message: lang === 'ar' ? "تم تأكيد الدفع بنجاح" : "Payment confirmed successfully"
+    });
+
+  } catch (err) {
+    next(err);
+  }
+};
 module.exports = {
     addRatingForOrderToRentalOffice,
     addRatingForOrderToServiceProvider,
     getratingbyrentalOffice,
     getRatingByServiceProvider,
+    changePaymentStatus
 }

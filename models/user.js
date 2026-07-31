@@ -20,7 +20,7 @@ const userSchema = new mongoose.Schema({
   },
   image: {
     type: String,
-    default: `${process.env.BASE_URL}images/rentalOffice.PNG`,
+    default: `${process.env.BASE_URL}/images/rentalOffice.PNG`,
   },
   resetOtp: {
     type: Number
@@ -74,6 +74,15 @@ const userSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "CarName"
   }],
+  typeIds: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "CarType"
+  }],
+  // إضافة موديلات السنوات (2020، 2024، الخ)
+  modelIds: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "CarModel"
+  }],
   cityId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "City"
@@ -89,6 +98,20 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  // داخل userSchema في ملف الموديول أضف هذا الحقل:
+storeVisitorsCount: {
+  type: Number,
+  default: 0
+  },
+pendingData: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null
+  },
+centerStatus: {
+    type: String,
+    enum: ["pending", "accepted", "refused"],
+    default: null
+},
   fcmToken: {
     type: String
   }

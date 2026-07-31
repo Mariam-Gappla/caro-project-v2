@@ -1,0 +1,10 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.carno.user",
+    "sha256_cert_fingerprints": [
+      "31:07:E7:D4:CF:72:42:51:B0:CF:9D:B9:B6:C6:6E:35:81:26:81:33:9C:26:AC:28:64:44:03:15:17:FF:79:8A"
+    ]
+  }
+}]

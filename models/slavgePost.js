@@ -43,6 +43,11 @@ const salvagePostSchema = new mongoose.Schema(
             ref: "User",
             required: true
         },
+        brandId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "CarName",
+            required: true
+        },
     },
     { timestamps: true }
 );

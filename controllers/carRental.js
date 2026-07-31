@@ -11,21 +11,26 @@ const path = require("path");
 const fs = require("fs");
 const addCar = async (req, res, next) => {
   try {
-    const files = req.files || [];
-    const imageBuffers = req.files || [];
+    
     const lang = req.headers['accept-language'] || 'en';
     const BASE_URL = process.env.BASE_URL || 'http://localhost:3000/';
-    // ⏰ نحفظ اسم الصورة مرة واحدة لكل صورة
-    const imagePaths = [];
-     let videoPath;
-    const fileInfos = files.map(file => {
-      const fileName = `${Date.now()}-${file.originalname}`;
-      const filePath = path.join('/var/www/images', fileName);
-      imagePaths.push(`${BASE_URL}images/${fileName}`);
-      return { fileName, filePath, buffer: file.buffer };
-    });
-    console.log(imagePaths);
-    const { rentalType } = req.body;
+    //  نحفظ اسم الصورة مرة واحدة لكل صورة
+    
+// 1. استلام الملفات من الروتر
+    const files = req.files?.images || [];
+    let videoPath;
+
+    // 2. تحويل الملفات إلى روابط (مرة واحدة فقط وبدون تكرار تعريف المتغير)
+    const imagePaths = files.map(file => `${BASE_URL}/images/${file.filename}`);
+
+    // 3. طباعة للتأكد في الـ Logs
+    console.log("Final Images Array to be saved:", imagePaths);
+
+    // 4. معالجة الفيديو
+    if (req.files?.video && req.files?.video?.length === 1) {
+        videoPath = `${BASE_URL}/images/${req.files.video[0].filename}`;
+    }
+     const { rentalType } = req.body;
     if (rentalType == "weekly/daily") {
        console.log(req.body);
       const { error } = carRentalWeeklyValiditionSchema(lang).validate({
@@ -40,7 +45,7 @@ const addCar = async (req, res, next) => {
         });
       }
       const video = req.files.video;
-      let videoPath;
+       
       if (video && video.length === 1) {
         videoPath = `${BASE_URL}${saveImage(video[0])}`;
       }
@@ -48,9 +53,8 @@ const addCar = async (req, res, next) => {
        ...req.body,
        images: imagePaths,
         rentalOfficeId: req.user.id,
-        videoCar: videoPath
+        videoCar: videoPath 
       });
-
     }
     else if (rentalType == "rent to own") {
       const { error } = rentToOwnSchema(lang).validate({
@@ -89,28 +93,28 @@ const addCar = async (req, res, next) => {
         videoCar: videoPath
       });
     }
-    // 💾 احفظ الملفات باستخدام الأسماء اللي جهزناها
-    fileInfos.forEach(file => {
-      fs.writeFileSync(file.filePath, file.buffer);
-      console.log('Saved file at:', file.filePath);
-    });
+    //  احفظ الملفات باستخدام الأسماء اللي جهزناها
+    // fileInfos.forEach(file => {
+    //   fs.writeFileSync(file.filePath, file.buffer);
+    //   console.log('Saved file at:', file.filePath);
+    // });
+   
+
     if (videoPath) {
       await Reel.create({
         video: post.video,
         title: post.title,
-        createdBy: post.userId
+        createdBy: post.userId,
+        orderId: post._id
       });
     }
-
-
-
     return res.status(200).send({
       code: 200,
       status: true,
       message: lang == "ar" ? "تم اضافه السياره بنجاح" : "car added successfully"
     });
   } catch (err) {
-    console.error("🔥 Error inside addCar:", err);
+    console.error(" Error inside addCar:", err);
     next(err);
   }
 }
@@ -134,7 +138,7 @@ const getCarsByRentalOfficeForUser = async (req, res, next) => {
       filter.rentalType = rentalType;
     }
     if (search) {
-      filter.title = search;
+     filter.title = { $regex: search, $options: 'i' };
     }
 
     // 📌 اجمالي عدد العربيات
@@ -161,11 +165,12 @@ const getCarsByRentalOfficeForUser = async (req, res, next) => {
         let formattedOrder = {};
 
         if (car.rentalType === "weekly/daily") {
+          
           formattedOrder = {
             id: car._id,
             title: car.title,
             rentalType: car.rentalType,
-            images: car.images,
+            images: car.images || [],
             carDescription: car.carDescription,
             carModel: lang == "en" ? model?.model?.en : model?.model?.ar,
             city: car.city,
@@ -178,7 +183,7 @@ const getCarsByRentalOfficeForUser = async (req, res, next) => {
             id: car._id,
             title: car.title,
             rentalType: car.rentalType,
-            images: car.images,
+            images: car.images || [],
             carDescription: car.carDescription,
             ownershipPeriod: car.ownershipPeriod,
             price: car.carPrice,
@@ -234,6 +239,7 @@ const getCarById = async (req, res, next) => {
     if (car.rentalType == "weekly/daily") {
       formatedData = {
         ...data,
+        images: car.images || [],
         nameId: {
           id: nameId._id,
           carName: lang == "en" ? nameId.carName.en : nameId.carName.ar
@@ -281,82 +287,93 @@ const updateCar = async (req, res, next) => {
   try {
     const id = req.params.id;
     const lang = req.headers['accept-language'] || 'en';
-    const BASE_URL = process.env.BASE_URL || 'http://localhost:3000/';
-    const messages = getMessages(lang);
-
-    const imageBuffers = req.files || [];
-
-    // 1. جيب العربية المرتبطة بالمستخدم الحالي
+    const BASE_URL = (process.env.BASE_URL || 'https://api.carnoapp.com').replace(/\/$/, '');
+    
+    // 1. جلب بيانات السيارة
     const car = await carRental.findOne({ _id: id, rentalOfficeId: req.user.id });
-    if (!car) {
-      return res.status(404).send({
-        status: false,
-        message: lang === "en" ? "Car not found" : "السيارة غير موجودة"
-      });
-    }
+    if (!car) return res.status(404).send({ status: false, message: "Car not found" });
 
-    // 2. جهزي الصور اللي عايز يحذفها
-    const imagesToDelete = req.body.imagesToDelete
-      ? Array.isArray(req.body.imagesToDelete)
-        ? req.body.imagesToDelete
-        : [req.body.imagesToDelete]
-      : [];
+    // 2. معالجة روابط الحذف (تحليل دقيق لـ Body)
+    let imagesToDelete = req.body.imagesToDelete;
+    let fileNamesToDelete = [];
 
-    // 3. حذف الصور من السيرفر
-    imagesToDelete.forEach(imgUrl => {
-      const fileName = imgUrl.split('/').pop();
-      const filePath = path.join('/var/www/images', fileName);
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    });
+    if (imagesToDelete) {
+      let deleteList = [];
 
-    // 4. الصور القديمة اللي هتفضل بعد الحذف
-    let updatedImages = car.images.filter(img => !imagesToDelete.includes(img));
-
-    // 5. جهزي الصور الجديدة
-    const fileInfos = imageBuffers.map(file => {
-      const fileName = `${Date.now()}-${file.originalname}`;
-      const filePath = path.join('/var/www/images', fileName);
-      updatedImages.push(BASE_URL + fileName);
-      return { fileName, filePath, buffer: file.buffer };
-    });
-
-    // 6. اختاري الـ schema المناسب حسب rentalType
-    const rentalType = req.body.rentalType || car.rentalType;
-
-    const schema = rentalType === "weekly/daily"
-      ? carRentalWeeklyValiditionUpdateSchema(lang)
-      : rentToOwnUpdateSchema(lang);
-
-    const { error } = schema.validate({ ...req.body, images: updatedImages });
-    if (error) {
-      return res.status(400).send({
-        code: 400,
-        status: false,
-        message: error.details[0].message
-      });
-    }
-
-    // 7. تحديث بيانات السيارة
-    await carRental.updateOne(
-      { _id: id },
-      {
-        $set: {
-          ...req.body,
-          images: updatedImages
-        }
+      // أحياناً تصل المصفوفة كـ String من Flutter (مثلاً: "url1,url2")
+      if (typeof imagesToDelete === 'string') {
+        // تنظيف الأقواس المربعة لو أُرسلت كـ نص [url]
+        let cleaned = imagesToDelete.replace(/[\[\]]/g, '');
+        deleteList = cleaned.split(',').map(item => item.trim());
+      } else if (Array.isArray(imagesToDelete)) {
+        deleteList = imagesToDelete;
       }
+
+      // استخراج اسم الملف فقط لضمان المطابقة
+      fileNamesToDelete = deleteList.map(url => String(url).split('/').pop().trim()).filter(n => n);
+    }
+
+    // 3. فلترة مصفوفة الصور الحالية
+    let currentImages = car.images || [];
+    let updatedImages = currentImages.filter(img => {
+      const fileNameInDb = String(img).split('/').pop().trim();
+      // نحتفظ بالصورة فقط إذا لم يكن اسم ملفها مطلوباً للحذف
+      return !fileNamesToDelete.includes(fileNameInDb);
+    });
+
+    // 4. إضافة الصور الجديدة
+    const newFiles = req.files?.images || [];
+    if (newFiles.length > 0) {
+      newFiles.forEach(file => {
+        updatedImages.push(`${BASE_URL}/images/${file.filename}`);
+      });
+    }
+
+    // 5. تجهيز بيانات التحديث
+    const updateData = { ...req.body };
+    delete updateData.images;
+    delete updateData.imagesToDelete;
+    delete updateData.rentalOfficeId;
+
+    // 6. التحديث الفعلي وحفظ المصفوفة الجديدة
+    const finalCar = await carRental.findOneAndUpdate(
+      { _id: id },
+      { $set: { ...updateData, images: updatedImages } },
+      { new: true }
     );
 
-    // 8. حفظ الصور الجديدة على السيرفر
-    fileInfos.forEach(file => {
-      fs.writeFileSync(file.filePath, file.buffer);
+    // 7. الحذف الفيزيائي من السيرفر
+    fileNamesToDelete.forEach(fileName => {
+      const filePath = path.join(process.cwd(), 'images', fileName);
+      if (fs.existsSync(filePath)) {
+        try { fs.unlinkSync(filePath); } catch (e) { }
+      }
     });
 
+    // 8. إرجاع الرد مع المدينة والمنطقة
     return res.status(200).send({
       status: true,
       code: 200,
-      message: lang === "en" ? "Car updated successfully" : "تم تحديث السيارة بنجاح"
-    });
+      message: lang === "ar" ? "تم التحديث بنجاح" : "Updated successfully",
+      data: {
+
+        id: finalCar._id,
+
+        title: finalCar.title,
+
+        images: finalCar.images,
+
+        city: finalCar.city,        // إرجاع المدينة
+
+        area: finalCar.area,        // إرجاع المنطقة
+
+        price: finalCar.priceDay || finalCar.carPrice,
+
+        rentalType: finalCar.rentalType,
+
+        carDescription: finalCar.carDescription
+      },
+    })
 
   } catch (err) {
     next(err);
@@ -393,7 +410,7 @@ const deleteCar = async (req, res, next) => {
     );
 
     // حذف من الجدول الأصلي
-    await carRental.findOneAndDelete({ _id: id });
+    await carRental.findOneAnd({ _id: id });
 
     return res.status(200).send({
       code: 200,
@@ -449,8 +466,13 @@ const getSearchCar = async (req, res, next) => {
     // format
     const formattedCars = await Promise.all(
       cars.map(async (car) => {
+
+        console.log(`Car ID: ${car._id}, Images in DB:`, car.images);
+
         const name = names.find(n => n._id.toString() === car.nameId.toString());
         const model = await Model.findById(car.modelId).lean();
+
+        const carImages = Array.isArray(car.images) && car.images.length > 0 ? car.images : [];
 
         let formattedOrder = {};
         if (car.rentalType === "weekly/daily") {
@@ -459,7 +481,7 @@ const getSearchCar = async (req, res, next) => {
               ? `تأجير سيارة ${name?.carName?.ar || ""} ${model?.model?.ar || ""}`
               : `Renting a car ${name?.carName?.en || ""} ${model?.model?.en || ""}`,
             rentalType: car.rentalType,
-            images: car.images,
+            images: carImages,
             carDescription: car.carDescription,
             carModel: lang === "en" ? model?.model?.en : model?.model?.ar,
             city: car.city,

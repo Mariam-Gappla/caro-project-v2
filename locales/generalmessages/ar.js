@@ -88,7 +88,7 @@ module.exports = {
   },
   rating:{
     success: "تم إضافة التقييم بنجاح",
-    invalidOrder:"يمكنك تقييم الطلب بعد الاستلام",
+    invalidOrder:"يمكنك تقييم الطلب بعد الدفع",
     alreadyRated: "لقد قمت بتقييم هذا الطلب بالفعل",
   }
   

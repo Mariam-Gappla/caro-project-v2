@@ -27,6 +27,8 @@ const salvagePostSchema = (lang = "en") => {
       .required()
       .messages(messages.location),
     locationText: Joi.string().required().messages(messages.location),
+    brandId: Joi.string().required()
+
   });
 };
 

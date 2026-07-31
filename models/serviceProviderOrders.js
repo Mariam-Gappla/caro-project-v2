@@ -72,6 +72,18 @@ const serviceProviderOrdersSchema = new mongoose.Schema(
       enum: ['pending', 'accepted', 'refused'],
       default: 'pending',
     },
+    tripStatus: {
+    type: String,
+    enum: ['on_the_way', 'arrived', 'loaded', 'arrived_dropoff', 'completed'],
+    default: 'on_the_way',
+    },
+    invoiceIssued: {
+      type: Boolean,
+      default: false
+    },
+    searchRadius: { type: Number, default: 50 }, // يبدأ بـ 50 متر
+    lastRadiusUpdate: { type: Date, default: Date.now },
+    isBroadcasted: { type: Boolean, default: false } // هل صار متاح للكل؟
   },
   {
     timestamps: true,
@@ -79,5 +91,6 @@ const serviceProviderOrdersSchema = new mongoose.Schema(
 );
 
 
+serviceProviderOrdersSchema.index({ "location": "2dsphere" });
 
 module.exports = mongoose.model('ServiceProviderOrders', serviceProviderOrdersSchema);

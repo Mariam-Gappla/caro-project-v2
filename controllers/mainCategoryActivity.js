@@ -33,7 +33,14 @@ const getAllMainCategoryActivity = async (req, res, next) => {
     try {
         const lang = req.headers["accept-language"] || "en";
         const mainCategories = await MainCategoryActivity.find({});
-        const formattedCategories = mainCategories.map(cat => ({ id: cat._id, text: cat.name[lang] }));
+
+        const formattedCategories = mainCategories.map(cat => ({
+            id: cat._id,
+            text: cat.name[lang],        // النص بناءً على لغة الهيدر
+            nameAr: cat.name.ar,         // الاسم العربي صراحةً
+            nameEn: cat.name.en          // الاسم الإنجليزي صراحةً
+        }));
+
         return res.status(200).send({
             status: true,
             code: 200,
@@ -44,8 +51,39 @@ const getAllMainCategoryActivity = async (req, res, next) => {
     catch (err) {
         next(err);
     }
-}
+};
+
+const deleteMainCategoryActivity = async (req, res, next) => {
+    try {
+        const lang = req.headers["accept-language"] || "en";
+        // نأخذ الـ id من الـ params (/:id)
+        const { id } = req.params;
+
+        // تنفيذ عملية الحذف والبحث في خطوة واحدة
+        const deletedCategory = await MainCategoryActivity.findByIdAndDelete(id);
+
+        // 🛡️ تحقق إذا كان المعرف (ID) موجوداً أصلاً في قاعدة البيانات
+        if (!deletedCategory) {
+            return res.status(404).send({
+                status: false,
+                code: 404,
+                message: lang === "en" ? "Main category not found" : "التصنيف الرئيسي غير موجود"
+            });
+        }
+
+        return res.status(200).send({
+            status: true,
+            code: 200,
+            message: lang === "en" ? "Main category deleted successfully" : "تم حذف التصنيف الرئيسي بنجاح"
+        });
+    }
+    catch (err) {
+        // تمرير الخطأ للميدل وير الخاص بالمعالجة العامة للأخطاء
+        next(err);
+    }
+};
 module.exports = {
     addMainCategoryActivity,
-    getAllMainCategoryActivity
+    getAllMainCategoryActivity,
+    deleteMainCategoryActivity
 };

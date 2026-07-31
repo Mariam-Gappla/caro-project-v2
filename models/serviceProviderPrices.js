@@ -16,7 +16,7 @@ tireEndPrice:{
     type:Number
 },
 batteryStartPrice:{
-type:Number
+    type:Number
 },
 batteryEndPrice:{
     type:Number

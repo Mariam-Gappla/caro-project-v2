@@ -15,12 +15,22 @@ const serviceProviderSchema = new mongoose.Schema({
         type: "string",
         required: true,
     },
+    serviceType: {
+        type: String, 
+        enum: ["1", "2", "3"], // 1: ونش، 2: كفر، 3: بطارية
+        default: "1" 
+    },
     status: {
         type: String,
         enum: ["pending", "accepted", "refused"],
         default: "pending"
 
     },
+profileImage: { type: String },
+    nationalIdImage: { type: String },
+    licenseImage: { type: String },
+    carRegistrationImage: { type: String },
+    carImage: { type: String },
     location: {
         lat: {
             type: Number
@@ -37,7 +47,7 @@ const serviceProviderSchema = new mongoose.Schema({
     },
     image: {
         type: String,
-        default: `${process.env.BASE_URL}images/rentalOffice.PNG`,
+        default: `${process.env.BASE_URL}/images/rentalOffice.PNG`,
     },
     fcmToken: {
         type: String

@@ -1,5 +1,6 @@
 const follower = require("../models/followersForRentalOffice");
 const rentalOffice = require("../models/rentalOffice");
+const User = require("../models/user");
 const getMessages = require("../configration/getmessages");
 const { sendNotification } = require("../configration/firebase.js");
 const { followerSchemaValidation } = require("../validation/followersForRentalOfficeValidition")
@@ -36,14 +37,18 @@ const addFollower = async (req, res, next) => {
                 message: lang == "en" ? "userId and rentalOfficeId is required" : "معرف المستخدم ومعرف المكتب مطلوبين"
             });
         }
+        const currentUser = await User.findById(userId);
+        if (!currentUser) {
+            return res.status(404).send({ status: false, message: "User not found" });
+        }
         const followers = await follower.create({ userId, rentalOfficeId });
         await sendNotification({
             target: existRentalOffice,
             targetType: "rentalOffice",
             titleAr: "متابع جديد",
             titleEn: "New Follower",
-            messageAr: `${user.username} بدأ بمتابعتك`,
-            messageEn: `${user.username} started following you`,
+            messageAr: `${currentUser.username} بدأ بمتابعتك`,
+            messageEn: `${currentUser.username} started following you`,
             actionType: "follow",
         });
         res.status(200).send({

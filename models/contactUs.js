@@ -1,6 +1,11 @@
 const mongoose = require('mongoose');
 
 const contactMessageSchema = new mongoose.Schema({
+  chatId: {
+    type: String, 
+    required: true,
+    index: true 
+  },
   name: {
     type: String,
     required: true
@@ -15,7 +20,7 @@ const contactMessageSchema = new mongoose.Schema({
   },
   senderType: {
     type: String,
-    enum: ['user', 'serviceProvider', 'rentalOffice'],
+    enum: ['user', 'serviceProvider', 'rentalOffice','admin'],
     required: true
   },
   senderId: {

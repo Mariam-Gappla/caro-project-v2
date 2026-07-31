@@ -42,6 +42,12 @@ const tireVerificationSchema = new mongoose.Schema({
   profileImage: {
     type: String,
   },
+      nationalIdImage:{
+       type: String
+    },
+    licenseImage:{
+       type: String
+    },
   status: {
     type: String,
     enum: ['pending', 'accepted', 'refused'],

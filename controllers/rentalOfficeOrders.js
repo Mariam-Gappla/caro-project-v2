@@ -19,7 +19,6 @@ const path = require("path");
 const mongoose = require('mongoose');
 const fs = require("fs");
 const User = require("../models/user");
-const SalvagePost = require("../models/slavgePost.js");
 const haversineDistance = (lat1, lon1, lat2, lon2) => {
     const toRad = (value) => (value * Math.PI) / 180;
     const R = 6371; // نصف قطر الأرض بالكيلومتر
@@ -146,15 +145,17 @@ const addOrder = async (req, res, next) => {
 
         // ✅ حفظ الصورة فعليًا
         const fileName = `${Date.now()}-${file.originalname.replace(/\s+/g, '_')}`;
-        const saveDir = '/var/www/images';
+        const saveDir = path.join(__dirname, '..', 'images'); // جرب هذا أو المسار الكامل المباشر
         const filePath = path.join(saveDir, fileName);
 
         if (!fs.existsSync(saveDir)) {
             fs.mkdirSync(saveDir, { recursive: true });
         }
 
-        fs.writeFileSync(filePath, file.buffer);
-        const fileUrl = `${BASE_URL}images/${fileName}`;
+        // fs.writeFileSync(filePath, file.buffer); 
+        const fileUrl = `${BASE_URL.replace(/\/$/, '')}/images/${file.filename}`;
+
+        // const fileUrl = `${BASE_URL}images/${fileName}`;
 
         // ✅ تجهيز بيانات الطلب
         const rentalOfficeId = car.rentalOfficeId;
@@ -192,7 +193,7 @@ const addOrder = async (req, res, next) => {
             messageAr: `لقد تلقيت طلبًا جديدًا من المستخدم ${user.username || 'عميل'}.`,
             messageEn: `You have received a new order from ${user.username || 'a customer'}.`,
             actionType: "order",
-            orderId: order._id,
+            orderId: String(order._id),
             request:true,
             orderModel: "OrdersRentalOffice",
             lang,
@@ -476,7 +477,7 @@ const getReportData = async (req, res, next) => {
         const cars = await CarRental.find({ rentalOfficeId });
         const rating = await Rating.find({ rentalOfficeId });
         // الإيرادات
-        const revenueResult = await rentalOfficeOrder.aggregate([
+        const revenueResult = await rentalOfficeOrders.aggregate([
             {
                 $match: {
                     rentalOfficeId: new mongoose.Types.ObjectId(String(rentalOfficeId))
@@ -639,42 +640,35 @@ const getOrderById = async (req, res, next) => {
 const acceptorder = async (req, res, next) => {
     try {
         const orderId = req.params.orderId;
-        const status = req.query.status
+        const status = req.query.status;
         const lang = req.headers['accept-language'] || 'en';
         const messages = getMessages(lang);
         const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+
         if (status == "accepted") {
-
-            const videoFiles = req.files.filter(f => f.fieldname === "video");
-            if (!req.files) {
+            // 1. فحص شامل للملفات
+            if (!req.files || (Array.isArray(req.files) && req.files.length === 0)) {
                 return res.status(400).send({
                     status: false,
                     code: 400,
-                    message: messages.rentalCar.video
+                    message: "الرجاء إرفاق فيديو للسيارة (No files received)"
                 });
-
             }
 
-            if (videoFiles.length === 0) {
+            // 2. البحث عن الفيديو بطريقة مرنة (حسب الاسم أو نوع الملف)
+            const allFiles = Array.isArray(req.files) ? req.files : Object.values(req.files).flat();
+            const file = allFiles.find(f => f.fieldname === "video" || f.mimetype.startsWith('video/'));
+
+            if (!file) {
                 return res.status(400).send({
                     status: false,
                     code: 400,
-                    message: messages.rentalCar.video
+                    message: "ملف الفيديو مفقود أو الحقل غير صحيح"
                 });
             }
 
-            if (videoFiles.length > 1) {
-                return res.status(400).send({
-                    status: false,
-                    code: 400,
-                    message: messages.rentalCar.onlyOneVideo
-                });
-            }
-
-            const file = videoFiles[0];
-
-            const allowedVideoTypes = ['video/mp4', 'video/mpeg', 'video/quicktime'];
-
+            // 3. التحقق من النوع
+            const allowedVideoTypes = ['video/mp4', 'video/mpeg', 'video/quicktime', 'video/x-matroska'];
             if (!allowedVideoTypes.includes(file.mimetype)) {
                 return res.status(400).send({
                     status: false,
@@ -683,59 +677,66 @@ const acceptorder = async (req, res, next) => {
                 });
             }
 
+            // 4. إنشاء الاسم وحفظ الملف (تصحيح مهم هنا)
+            // ملاحظة: إذا كنت تستخدم memoryStorage، يجب استخدام file.buffer
+            // إذا كنت تستخدم diskStorage، الملف موجود بالفعل في file.path
             const fileName = `${Date.now()}-${file.originalname.replace(/\s+/g, '_')}`;
-
-            // نخلي المسار مطلق على السيرفر
-            const saveDir = '/var/www/images';
+            const saveDir = path.join(__dirname, '..', 'images');
             const filePath = path.join(saveDir, fileName);
 
             if (!fs.existsSync(saveDir)) {
                 fs.mkdirSync(saveDir, { recursive: true });
             }
 
-            fs.writeFileSync(filePath, file.buffer);
+            // حفظ الملف فعلياً
+            if (file.buffer) {
+                fs.writeFileSync(filePath, file.buffer);
+            } else if (file.path) {
+                fs.renameSync(file.path, filePath);
+            }
 
-            console.log("Saved file at:", filePath);
+            // إنشاء الرابط الصحيح (استخدم fileName الذي أنشأته أنت وليس file.filename)
+            const fileUrl = `${BASE_URL.replace(/\/$/, '')}/images/${fileName}`;
 
-            // نرجع لينك مباشر يوصل من المتصفح
-            const fileUrl = `${BASE_URL}images/${fileName}`;
-            const rentalOfficeId = req.user.id;
+            // 5. تحديث قاعدة البيانات
             const order = await rentalOfficeOrders.findByIdAndUpdate(
-                { _id: orderId },
+                orderId,
                 { status: status },
                 { new: true }
             );
 
             if (!order) {
-                return res.status(400).send({
-                    status: false,
-                    code: 400,
-                    message: messages.order.notExist
-                });
+                return res.status(400).send({ status: false, message: messages.order.notExist });
             }
 
-            const updatedCar = await CarRental.findByIdAndUpdate(
-                { _id: order.carId },
+            // تخزين رابط الفيديو في موديل السيارة
+            await CarRental.findByIdAndUpdate(
+                order.carId,
                 { videoCar: fileUrl },
                 { new: true }
             );
             const user = await User.findById(order.userId);
+            const car = await CarRental.findById(order.carId);
+            const office = await rentalOffice.findById(order.rentalOfficeId);
+            const carName = car ? car.title : "السيارة";
+            const officeName = office ? office.username : "المكتب";
             const counter = await getNextOrderNumber("invoice");
             await invoice.create({
                 invoiceNumber: counter,
                 userId: order.userId,
                 targetType: "rentalOffice",
-                targetId: rentalOfficeId,
+                targetId: order.rentalOfficeId,
                 orderType: "OrdersRentalOffice",
                 orderId: order._id,
                 amount: order.totalCost,
             });
+
             await sendNotification({
                 target: user, // المستخدم اللي قدم الطلب
                 targetType: "User",
                 titleAr: "تمت الموافقة على طلبك",
                 titleEn: "Your order has been approved",
-                messageAr: `تمت الموافقة على طلبك رقم ${order._id} من قبل ${user.username || 'مستخدم'}`,
+                messageAr: `تمت الموافقة على طلبك لاستئجار ${carName} من ${officeName}`,
                 messageEn: `Your order #${order._id} has been approved by ${user.username || 'the user'}`,
                 actionType: "order",
                 orderId: order._id,
@@ -763,16 +764,20 @@ const acceptorder = async (req, res, next) => {
                 });
             }
             const user = await User.findById(order.userId);
+            const car = await CarRental.findById(order.carId);
+            const office = await rentalOffice.findById(order.rentalOfficeId);
+            const carName = car ? car.title : "السيارة";
+            const officeName = office ? office.username : "المكتب";
             await sendNotification({
                 target: user,
                 targetType: "User",
                 titleAr: "تم رفض طلبك",
                 titleEn: "Your order has been rejected",
-                messageAr: `تم رفض طلبك رقم ${order._id} من قبل ${user.username || 'المستخدم'}`,
-                messageEn: `Your order #${order._id} has been rejected by ${user.username || 'the user'}`,
-                actionType: "orderRejected",
+                messageAr: `نأسف، تم رفض طلبك لاستئجار ${carName} من قبل ${officeName}`,
+                messageEn: `Sorry, your order for ${carName} has been rejected by ${officeName}`,
+                actionType: "order",
                 orderId: order._id,
-                orderModel: "ServiceProviderOrder", // أو OrdersRentalOffice حسب نوع الطلب
+                orderModel: "OrdersRentalOffice", // أو OrdersRentalOffice حسب نوع الطلب
                 lang: lang,
             });
             return res.status(200).send({
@@ -781,11 +786,6 @@ const acceptorder = async (req, res, next) => {
                 message: lang == "en" ? "order refused" : "تم رفض الطلب",
             });
         }
-
-
-
-
-
     } catch (error) {
         next(error);
     }
@@ -995,14 +995,23 @@ const getOrdersByRentalOffice = async (req, res, next) => {
     }
 };
 const endOrder = async (req, res, next) => {
+    console.log("🚀 [Start] endOrder triggered for ID:", req.params.id);
     try {
         const lang = req.headers['accept-language'] || 'en';
         const orderId = req.params.id;
         const rentalOfficeId = req.user.id;
+
         const order = await rentalOfficeOrders.findOne({ _id: orderId });
-        if (order.paymentMethod == "cash") {
-            order.ended = true
+        
+        if (!order) {
+            return res.status(404).json({ message: "Order not found" });
+        }
+
+        if (order.paymentMethod == "cash" || order.paymentMethod == "mada" ||(order.paymentMethod == "online" && order.paymentStatus == "paid")) {
+            
+            order.ended = true;
             await order.save();
+
             const count = await counter.findOneAndUpdate(
                 { name: "invoice" },
                 { $inc: { seq: 1 } },
@@ -1019,53 +1028,25 @@ const endOrder = async (req, res, next) => {
                 rentalOfficeId,
                 orderId,
                 amount: order.totalCost,
+                orderType: 'OrdersRentalOffice',
             });
 
             return res.status(200).send({
                 status: true,
                 code: 200,
-                message: lang == "en" ? "order ended succesfully" : "تم انهاء الاوردر بنجاح"
-            })
+                message: lang == "en" ? "order ended successfully" : "تم انهاء الاوردر بنجاح"
+            });
         }
-        else if (order.paymentMethod == "online") {
-            if (order.paymentStatus == "paid") {
-                order.ended = true
-                await order.save();
-                const count = await counter.findOneAndUpdate(
-                    { name: "invoice" },
-                    { $inc: { seq: 1 } },
-                    { returnDocument: "after", upsert: true }
-                );
-
-                if (!count) {
-                    return res.status(500).json({ message: "Counter not found" });
-                }
-
-                await invoice.create({
-                    invoiceNumber: count.seq,
-                    userId: order.userId,
-                    rentalOfficeId,
-                    orderId,
-                    amount: order.totalCost,
-                });
-                return res.status(200).send({
-                    status: true,
-                    code: 200,
-                    message: lang == "en" ? "order ended succesfully" : "تم انهاء الاوردر بنجاح"
-                })
-            }
-            else {
-                return res.status(200).send({
-                    status: true,
-                    code: 200,
-                    message: lang == "en" ? "you can not end order because order unpaid" : "لا تستطيع انهاء الاوردر لانه لم يتم الدفع"
-                })
-
-            }
+        else {
+            return res.status(200).send({
+                status: false,
+                code: 200,
+                message: lang == "en" ? "you can not end order because order unpaid" : "لا تستطيع انهاء الاوردر لانه لم يتم الدفع"
+            });
         }
     }
     catch (error) {
-        next(error)
+        next(error);
     }
 }
 const getAllUserOrders = async (req, res, next) => {
@@ -1081,9 +1062,11 @@ const getAllUserOrders = async (req, res, next) => {
         let filterServiceProvider = { userId }
         let slavePosts = [];
         let filterSlavge = { userId };
-        if (status == "paid") {
+        if (status == "active") {
             filterrentalOffice.status = "accepted";
             filterServiceProvider.status = "accepted";
+            filterrentalOffice.ended = false;
+            filterServiceProvider.ended = false;
         }
         if (status == "inProgress") {
             filterrentalOffice.paymentStatus = "inProgress"
@@ -1091,12 +1074,19 @@ const getAllUserOrders = async (req, res, next) => {
             filterServiceProvider.status = "pending";
             filterServiceProvider.paymentStatus = "inProgress";
             filterSlavge.ended = false
+
+            // ✅ جيب الـ brand array من المستخدم الحالي
+            const currentUser = await User.findById(userId).lean();
+            const userBrands = currentUser?.brand || [];
+
             slavePosts = await SlavgePost.find({
                 ended: false,
-                hiddenBy: { $ne: userId } // تجاهل أي منشور مخفي لهذا المقدم
+                hiddenBy: { $ne: userId },
+                brandId: { $in: userBrands } // ✅ فقط الاعلانات اللي brandId حقها موجود عند المستخدم
             })
-                .populate("userId")
-                .lean();
+            .populate("userId")
+            .lean();
+
             slavePostsFormatted = await Promise.all(
                 slavePosts.map(async (post) => {
                     return {
@@ -1130,6 +1120,7 @@ const getAllUserOrders = async (req, res, next) => {
                         type: "slavePost",
                         title: post.title,
                         image: post.images[0],
+                        username: post.providerId ? post.providerId.username : " ",
                         locationText: post.locationText,
                         details: post.details,
                         createdAt: post.createdAt,
@@ -1143,9 +1134,17 @@ const getAllUserOrders = async (req, res, next) => {
         }
         const messages = getMessages(lang);
 
-        const paymentStatusTranslations = {
-            en: { ended: "Ended", inProgress: "inProgress", paid: "Paid" },
-            ar: { ended: "منتهيه", inProgress: "بأنتظار الدفع", paid: "تم الدفع" }
+         const paymentStatusTranslations = {
+            en: {
+                ended: "Ended",
+                inProgress: "inProgress",
+                paid: "Paid"
+            },
+            ar: {
+                ended: "منتهي",
+                inProgress: "بأنتظار الدفع",
+                paid: "تم الدفع"
+            }
         };
 
         // 🟢 1. طلبات المستخدم من مكتب التأجير
@@ -1169,6 +1168,7 @@ const getAllUserOrders = async (req, res, next) => {
                     return {
                         id: order._id,
                         type: "rentalOffice",
+                        username: order.rentalOfficeId.username,
                         title: carData.title,
                         rentalType: carData.rentalType,
                         startDate: order.startDate,
@@ -1181,12 +1181,14 @@ const getAllUserOrders = async (req, res, next) => {
                         totalCost: order.totalCost,
                         paymentStatus,
                         paymentStatusText,
-                        createdAt: order.createdAt
+                        createdAt: order.createdAt,
+                        isRated: !!(await Rating.exists({ userId, rentalOfficeId: order.rentalOfficeId }))
                     };
                 } else {
                     return {
                         id: order._id,
                         type: "rentalOffice",
+                        username: order.rentalOfficeId.username,
                         title: carData.title,
                         ownershipPeriod: carData.ownershipPeriod,
                         rentalType: carData.rentalType,
@@ -1198,7 +1200,8 @@ const getAllUserOrders = async (req, res, next) => {
                         totalCost: order.totalCost,
                         paymentStatus,
                         paymentStatusText,
-                        createdAt: order.createdAt
+                        createdAt: order.createdAt,
+                        isRated: !!(await Rating.exists({ userId, rentalOfficeId: order.rentalOfficeId }))
                     };
                 }
             })
@@ -1261,6 +1264,7 @@ const getAllUserOrders = async (req, res, next) => {
                     distanceToProvider: order.providerId ? distance : undefined,
                     distanceToDrop: order.providerId ? distanceDrop : undefined,
                     createdAt: order.createdAt,
+                    isRated: !!(await ProviderRating.exists({ userId, serviceProviderId: order.providerId })),
                     userData: order.providerId ? {
                         username: order.providerId.username,
                         image: order.providerId.image,
@@ -1309,27 +1313,80 @@ const getAllUserOrders = async (req, res, next) => {
         next(error);
     }
 };
+// const cancelOrder = async (req, res, next) => {
+//     try {
+//         const lang = req.headers['accept-language'] || 'en';
+//         const { id, type } = req.body
+//         let TargetModel;
+//         if (type == "slavgePost") {
+//             TargetModel = SlavgePost
+//         }
+//         if (type == "serviceProvider") {
+//             TargetModel = serviceProviderOrder
+//         }
+//         await Model.findByIdAndDelete(id);
+//         return res.status(200).send({
+//             code: 200,
+//             status: true,
+//             message: lang == "en" ? "order canceled successfuly" : "تم الغاء الاوردر بنجاح"
+//         })
+
+//     }
+//     catch (err) {
+//         next(err)
+//     }
+// }
 const cancelOrder = async (req, res, next) => {
     try {
         const lang = req.headers['accept-language'] || 'en';
-        const { id, type } = req.body
-        let Model;
-        if (type == "salvagePost") {
-            Model = SalvagePost
+        const { id, type } = req.body;
+        
+        // غيرنا الاسم هنا من Model إلى TargetModel عشان ما يتصادم مع "const Model" اللي فوق
+        let TargetModel; 
+
+        if (type === "slavePost") {
+            TargetModel = SlavgePost;
+        } else if (type === "serviceProvider") {
+            TargetModel = serviceProviderOrder;
         }
-        if (type == "serviceProvider") {
-            Model = serviceProviderOrder
+
+        // فحص أمان: إذا لم يجد الموديل لا يكمل الكود ولا ينهار السيرفر
+        if (!TargetModel) {
+            return res.status(400).send({
+                code: 400,
+                status: false,
+                message: lang === "en" ? `Invalid type: ${type}` : `نوع الطلب غير صحيح: ${type}`
+            });
         }
-        await Model.findByIdAndDelete(id);
+
+        const io = req.app.get('socketio'); 
+        if (io) {
+            io.to(`order_${id}`).emit("orderStatus", {
+                orderId: id,
+                status: "canceled",
+                messageAr: "تم إلغاء الطلب بنجاح",
+                messageEn: "Order canceled successfully"
+            });
+        }
+
+        const result = await TargetModel.findByIdAndDelete(id);
+
+        if (!result) {
+            return res.status(404).send({
+                code: 404,
+                status: false,
+                message: lang === "en" ? "Order not found" : "الطلب غير موجود"
+            });
+        }
+
         return res.status(200).send({
             code: 200,
             status: true,
-            message: lang == "en" ? "order canceled successfuly" : "تم الغاء الاوردر بنجاح"
-        })
+            message: lang === "en" ? "order canceled successfully" : "تم الغاء الطلب بنجاح"
+        });
 
-    }
-    catch (err) {
-        next(err)
+    } catch (err) {
+        next(err);
     }
 }
 const hidenPost = async (req, res, next) => {
@@ -1337,7 +1394,7 @@ const hidenPost = async (req, res, next) => {
         const userId = req.user.id;
         const { postId } = req.body;
         const lang = req.headers['accept-language'] || 'en';
-        await SalvagePost.findByIdAndUpdate(postId, {
+        await SlavgePost.findByIdAndUpdate(postId, {
             $addToSet: { hiddenBy: userId } // يضيفه فقط إذا لم يكن موجودًا
         });
         res.send({

@@ -86,6 +86,7 @@ const addPost = async (req, res, next) => {
       title: post.title,
       image: post.images[0],
       locationText: post.locationText,
+      brandId: post.brandId,
       details: post.details,
       createdAt: post.createdAt,
       userData: {
@@ -110,6 +111,7 @@ const addPost = async (req, res, next) => {
 const endPost = async (req, res, next) => {
   try {
     const lang = req.headers['accept-language'] || 'en';
+    const io = req.app.get('io');
     const { providerId } = req.body;
     const userId = req.user.id;
 
@@ -133,7 +135,7 @@ const endPost = async (req, res, next) => {
     const updatedPost = await SlavagePost.findOneAndUpdate(
       { _id: req.params.id },
       { ended: true, providerId: providerId },
-      { new: true, session }
+      { new: true }
     );
 
     const user = await User.findOne({ _id: providerId })

@@ -1,3 +1,4 @@
+
 const express = require("express");
 const app = express();
 const http = require("http");
@@ -12,22 +13,48 @@ const connectDB = require("./configration/dbconfig.js");
 
 // 🟢 Socket.IO
 const socketConnection = require("./configration/socket.js");
+const cors = require('cors');
+
+// مصفوفة الدومينات المسموح لها
+const allowedOrigins = [
+  "https://carnoapp.com", 
+  "https://www.carnoapp.com",
+  "http://localhost:3000",     
+  "http://192.168.1.224:3000",
+  "http://dashboard.carnoapp.com"
+];
 const io = new Server(server, {
   cors: {
-    origin: ["https://carnoapp.com", "https://www.carnoapp.com"],
+    origin: allowedOrigins,
     methods: ["GET", "POST"],
     credentials: true,
   },
 });
 app.set("io", io);
+app.use(cors({
+  origin: function (origin, callback) {
+    // السماح بالطلبات التي ليس لها origin (مثل تطبيقات الموبايل أو Postman)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+}));
 
-
+app.use(express.json());
 
 
 
 
 // 🟢 Routes
 const userRoutes = require("./routes/userroutes.js");
+const adminRoutes = require("./routes/adminroutes.js");
+const statsRoutes = require("./routes/statsRoutes.js");
 const tweetRoutes = require("./routes/tweetroutes.js");
 const commentRoutes = require("./routes/commentroutes.js");
 const cars = require("./routes/carRentalroutes.js");
@@ -93,7 +120,8 @@ const faqRoutes=require("./routes/faqroutes.js");
 const serviceProviderPricingRoutes=require("./routes/serviceProviderPricingroutes.js");
 const auctionOrderRoutes=require("./routes/auctionOrderroutes.js");
 const TrackingRoutes=require("./routes/trackingroutes.js");
-const currencyRoutes=require("./routes/currencyroutes.js");
+const currencyRoutes = require("./routes/currencyroutes.js");
+const {startOrderDistributor} = require('./jobs/orderDistributor.js');
 // 🟢 Middleware
 app.use(express.json());
 
@@ -101,9 +129,11 @@ app.use(express.json());
 const authenticateToken = (req, res, next) => {
   if (
     req.originalUrl.includes("login") ||
+    req.originalUrl.includes("adminlogin") ||
     req.originalUrl.includes("verify-otp") ||
     req.originalUrl.includes("send-otp") ||
-    req.originalUrl.includes("images")||
+    req.originalUrl.includes("images") ||
+    req.originalUrl.includes("videos") ||
     req.originalUrl.includes("request-reset-password")||
     req.originalUrl.includes("reset-password")||
     req.originalUrl.includes("logout")||
@@ -126,18 +156,63 @@ const authenticateToken = (req, res, next) => {
 };
 
 app.use(authenticateToken);
-app.use('/images', express.static(path.join(__dirname, 'images'), {
-  setHeaders: (res, path) => {
-    if (path.endsWith(".mp4")) {
-      res.setHeader("Content-Type", "video/mp4");
-      res.setHeader("Content-Disposition", "inline"); // 👈 يخلي الفيديو يتعرض مش ينزل
-    }
-  }
-}));
+
+app.use(
+  "/images",
+  express.static(path.join(__dirname, "images"), { // استخدمنا __dirname
+    setHeaders: (res, filePath) => {
+      const lowerPath = filePath.toLowerCase();
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Accept-Ranges", "bytes");
+      if (lowerPath.endsWith(".mp4")) {
+        res.setHeader("Content-Type", "video/mp4");
+      }
+      else if (lowerPath.endsWith(".mov")) {
+        res.setHeader("Content-Type", "video/quicktime");
+      }
+    },
+  })
+);
+// app.use(
+//   "/images",
+//   express.static(path.join(process.cwd(), "images"), {
+//     setHeaders: (res, filePath) => {
+//       const lowerPath = filePath.toLowerCase(); // تعريف المتغير هنا
+//       if (filePath.endsWith(".mp4")) {
+//         res.setHeader("Content-Type", "video/mp4");
+//         res.setHeader("Accept-Ranges", "bytes");
+//       }
+//       else if (lowerPath.endsWith(".mov")) {
+//         res.setHeader("Content-Type", "video/quicktime");
+//         res.setHeader("Accept-Ranges", "bytes");
+//       }
+//     },
+//   })
+// );
+
+app.use(
+  "/videos",
+  express.static(path.join(process.cwd(), "public/videos"), {
+    setHeaders: (res, filePath) => {
+      const lowerPath = filePath.toLowerCase();
+      if (filePath.endsWith(".mp4")) {
+        res.setHeader("Content-Type", "video/mp4");
+        res.setHeader("Accept-Ranges", "bytes");
+      }
+      else if (lowerPath.endsWith(".mov")) {
+        res.setHeader("Content-Type", "video/quicktime");
+        res.setHeader("Accept-Ranges", "bytes");
+      }
+    },
+  })
+);
+
 
 
 // 🟢 Apply Routes
 app.use("/otp", otp);
+app.use("/admin", adminRoutes);
+app.use("/stats", statsRoutes);
 app.use("/users", userRoutes);
 app.use("/tweets", tweetRoutes);
 app.use("/comments", commentRoutes);
@@ -218,4 +293,5 @@ server.listen(port, async () => {
   await connectDB();
   console.log(`✅ Server is running on port ${port}`);
   socketConnection(io); // ← تفعيل socket.io هنا
+  startOrderDistributor(io);
 });

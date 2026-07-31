@@ -25,6 +25,10 @@ const changePasswordSchema = (lang = "en") => {
         "any.required": messages.confirmPasswordRequired,
         "any.only": messages.confirmPasswordMismatch,
       }),
+    role: Joi.string()
+      .valid("admin", "user", "serviceProvider", "rentalOffice")
+      .optional(),
+    id: Joi.string().optional(),
   });
 };
 

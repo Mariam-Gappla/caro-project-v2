@@ -5,6 +5,15 @@ const postSchema = (lang = "en") => {
   const messages = getMessages(lang);
 
   return Joi.object({
+    images: Joi.array().items(Joi.string()).optional().messages({
+  "array.base": lang === "en" ? "Images must be an array" : "الصور يجب أن تكون مصفوفة"
+    }),
+    car_type: Joi.string().optional().allow('').messages({
+      "string.base": lang === "en" ? "Car type must be a string" : "نوع السيارة يجب أن يكون نصاً"
+    }),
+    car_model: Joi.string().optional().allow('').messages({
+      "string.base": lang === "en" ? "Car model must be a string" : "موديل السيارة يجب أن يكون نصاً"
+    }),
     title: Joi.string().required().messages({
       "string.empty": messages.title,
       "any.required": messages.title

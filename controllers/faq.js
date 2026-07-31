@@ -51,4 +51,29 @@ const getFaqs = async (req, res, next) => {
     next(err);
   }
 };
-module.exports = { addFaq, getFaqs };
+
+const deleteFaq = async (req, res, next) => {
+  try {
+    const lang = req.headers["accept-language"] === "ar" ? "ar" : "en";
+    const { id } = req.params; // استلام الـ ID من الرابط
+
+    const deletedFaq = await FAQ.findByIdAndDelete(id);
+
+    if (!deletedFaq) {
+      return res.status(404).send({
+        status: false,
+        code: 404,
+        message: lang === "ar" ? "السؤال غير موجود" : "FAQ not found",
+      });
+    }
+
+    res.status(200).send({
+      status: true,
+      code: 200,
+      message: lang === "ar" ? "تم حذف السؤال بنجاح" : "FAQ deleted successfully",
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+module.exports = { addFaq, getFaqs, deleteFaq };

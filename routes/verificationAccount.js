@@ -16,26 +16,14 @@ router.post(
 );
 router.post(
   "/uploadTireImages",
-  upload.fields([
-    { name: "profileImage", maxCount: 1 }
+upload.fields([
+    { name: "profileImage", maxCount: 1 },
+    { name: "nationalIdImage", maxCount: 1 }, // أضفنا الهوية
+    { name: "licenseImage", maxCount: 1 }    // أضفنا الرخصة
   ]),
   uploadTireImages
 );
 router.post("/submitTireVerification",submitTireVerification);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 module.exports=router;

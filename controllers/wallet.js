@@ -62,7 +62,7 @@ const deposit = async (req, res, next) => {
     const lang = req.headers['accept-language'] || 'en';
     const userId = req.user.id;
     const { amount, description, date, cvv, name, numberId } = req.body;
-    const user = User.findById(userId);
+    const user = await User.findById(userId);
     if (amount <= 0) {
       return res.status(400).send({
         code: 400,
@@ -203,7 +203,7 @@ const withdraw = async (req, res, next) => {
   try {
     const { userId } = req.user;
     const { amount, description } = req.body;
-    const user = User.findById(userId);
+    const user = await User.findById(userId);
     if (amount <= 0) {
       return res.status(400).json({ status: false, message: "Amount must be greater than 0" });
     }

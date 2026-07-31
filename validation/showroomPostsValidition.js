@@ -1,5 +1,6 @@
 const Joi = require("joi");
 const getMessages = require("../locales/schemaValiditionMessages/showroomPostValiditionMessages");
+const area = require("../models/area");
 
 const showroomPostSchema = (lang = "en") => {
   const messages = getMessages(lang);
@@ -7,8 +8,8 @@ const showroomPostSchema = (lang = "en") => {
   return Joi.object({
     title: Joi.string().required().messages(messages.title),
     deliveryOptionId: Joi.string()
-      .required()
-      .messages(messages.deliveryOptionId),
+      .optional()
+      .allow('', null),
 
     carNameId: Joi.string().required().messages(messages.carNameId),
 
@@ -26,11 +27,14 @@ const showroomPostSchema = (lang = "en") => {
 
     fuelTypeId: Joi.string().required().messages(messages.fuelTypeId),
 
-    carBodyId: Joi.string().required().messages(messages.carBodyId),
+    carBodyId: Joi.string().optional()
+      .allow('', null),
+    
+    areaId: Joi.string().required().messages(messages.areaId),
 
     cylindersId: Joi.string().required().messages(messages.cylindersId),
 
-    carConditionId: Joi.string().required().messages(messages.carConditionId),
+    carConditionId: Joi.string().required().trim().messages(messages.carConditionId),
 
     interiorColor: Joi.string().required().messages(messages.interiorColor),
 

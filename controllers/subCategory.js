@@ -19,23 +19,50 @@ const getSubCategories = async (req, res, next) => {
 const addSubCategory = async (req, res, next) => {
     try {
         const lang = req.headers["accept-language"] || "ar";
-        const {subCategoryAr, subCategoryEn} = req.body;
-        if(!subCategoryAr || !subCategoryEn){
+        const data = req.body;
+        const mainCategoryId = req.params.id; // نأخذ الـ ID من الرابط
+
+        // ✅ 1. التحقق إذا كانت البيانات مصفوفة (إضافة جماعية)
+        if (Array.isArray(data)) {
+            const formattedSubs = data.map(item => ({
+                name: { 
+                    ar: item.nameAr || item.subCategoryAr, 
+                    en: item.nameEn || item.subCategoryEn 
+                },
+                mainCategoryId: mainCategoryId // نربط الجميع بالـ ID الموجود في الرابط
+            }));
+
+            await SubCategory.insertMany(formattedSubs, { ordered: false });
+
+            return res.status(200).send({
+                status: true,
+                code: 200,
+                message: lang == "ar" ? "تم إضافة قائمة الأقسام بنجاح" : "Sub categories list added successfully",
+            });
+        }
+
+        // ✅ 2. كودك الأصلي للإضافة الفردية (مع تصحيح بسيط لاستخدام data)
+        const { subCategoryAr, subCategoryEn, nameAr, nameEn } = data;
+        const ar = subCategoryAr || nameAr;
+        const en = subCategoryEn || nameEn;
+
+        if (!ar || !en) {
             return res.status(400).send({
                 status: false,
                 code: 400,
-                message: lang=="ar"?"القسم الفرعى مطلوب عربى وانجليزى":"sub Category in Arabic and English is required"
+                message: lang == "ar" ? "القسم الفرعى مطلوب عربى وانجليزى" : "Sub category in Arabic and English is required"
             });
         }
-        const category = await SubCategory.create({
-            name: { ar: subCategoryAr, en: subCategoryEn },
-            mainCategoryId: req.params.id
+
+        await SubCategory.create({
+            name: { ar: ar, en: en },
+            mainCategoryId: mainCategoryId
         });
 
         return res.status(200).send({
             status: true,
             code: 200,
-            message: lang=="ar"?"تم إضافة القسم بنجاح":"sub Category added successfully",
+            message: lang == "ar" ? "تم إضافة القسم بنجاح" : "Sub category added successfully",
         });
 
     } catch (error) {
@@ -84,21 +111,26 @@ const updateSubCategory = async (req, res, next) => {
 };
 const deleteSubCategory = async (req, res, next) => {
     try {
+        // 1. تعريف اللغة من الهيدر (هذا هو السطر الناقص عندك)
+        const lang = req.headers['accept-language'] === 'ar' ? 'ar' : 'en';
+        
         const categoryId = req.params.id;
-        const category = await SubCategory.findByIdAndDelete({ _id: categoryId });
+
+        // 2. تصحيح: findByIdAndDelete تأخذ الأيدي مباشرة بدون كائن _id
+        const category = await SubCategory.findByIdAndDelete(categoryId);
 
         if (!category) {
-            return res.status(400).send({
+            return res.status(404).send({ // يفضل 404 لأن القسم غير موجود
                 status: false,
-                code: 400,
-                message:lang=="ar"? "القسم الفرعى غير موجود":"sub Category not found"
+                code: 404,
+                message: lang == "ar" ? "القسم الفرعي غير موجود" : "Sub Category not found"
             });
         }
 
         return res.status(200).send({
             status: true,
             code: 200,
-            message: lang=="ar"?"تم حذف القسم الفرعى بنجاح":"sub Category deleted successfully"
+            message: lang == "ar" ? "تم حذف القسم الفرعي بنجاح" : "Sub Category deleted successfully"
         });
 
     } catch (error) {

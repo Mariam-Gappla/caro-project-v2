@@ -4,14 +4,14 @@ const addVehicleType = async (req, res, next) => {
     try {
         const { vehicleName } = req.body;
         const lang = req.headers['accept-language'] || 'en';
-        const { error } = recoveryVehicleTypeSchema(lang).validate(req.body);
-        if (error) {
+        if (!vehicleName) {
             return res.status(400).send({
                 code: 400,
                 status: false,
                 message: error.details[0].message,
             });
-        }
+      }
+      const { error } = recoveryVehicleTypeSchema(lang).validate(req.body);
         // التحقق من وجود النوع مسبقًا
         const existingVehicle = await vehicle.findOne({ name: vehicleName.trim() });
         if (existingVehicle) {

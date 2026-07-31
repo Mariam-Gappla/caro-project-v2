@@ -1,6 +1,7 @@
 const express=require("express");
 const router=express.Router();
-const {addSlavgeService,getSlaveServices}=require("../controllers/slavgeService");
+const {addSlavgeService,getSlaveServices,deleteSlavgeService}=require("../controllers/slavgeService");
 router.post("/",addSlavgeService);
-router.get("/",getSlaveServices);
+router.get("/", getSlaveServices);
+router.delete("/:id", deleteSlavgeService);
 module.exports=router;
