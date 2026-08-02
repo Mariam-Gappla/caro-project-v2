@@ -720,6 +720,11 @@ const getReports = async (req, res, next) => {
         next(err);
     }
 };
+const updatePassword= async (req, res, next) => {
+    const password = "caroUser";
+const updatedPassword = await bcrypt.hash(password, 10);
+console.log("Updated hashed password:", updatedPassword);
+}
 // ... الاستدعاءات كما هي ...
 // أضف هذا السطر لأنه ناقص عندك ويسبب الانهيار في الـ populate
 const City = require("../models/city"); 
@@ -1316,5 +1321,6 @@ module.exports = {
     getCenterServices,
     getServiceProviderOrdersForAdmin,
     deleteServiceProviderOrder,
-    getServiceProviderOrderDetails
+    getServiceProviderOrderDetails,
+    updatePassword
 }

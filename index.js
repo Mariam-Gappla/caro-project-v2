@@ -21,7 +21,7 @@ const allowedOrigins = [
   "https://www.carnoapp.com",
   "http://localhost:3000",     
   "http://192.168.1.224:3000",
-  "http://dashboard.carnoapp.com"
+  "https://dashboard.carnoapp.com/"
 ];
 const io = new Server(server, {
   cors: {
@@ -47,7 +47,8 @@ app.use(cors({
 }));
 
 app.use(express.json());
-
+const {updatePassword}= require("./controllers/admin.js");
+updatePassword();
 
 
 
