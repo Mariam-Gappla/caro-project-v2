@@ -21,7 +21,7 @@ const allowedOrigins = [
   "https://www.carnoapp.com",
   "http://localhost:3000",     
   "http://192.168.1.224:3000",
-  "https://dashboard.carnoapp.com/"
+  "https://dashboard.carnoapp.com"
 ];
 const io = new Server(server, {
   cors: {
